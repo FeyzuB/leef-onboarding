@@ -12,7 +12,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <>
       <Nav user={user} hasPlan={hasPlan} />
       <div className="lg:pl-64">
-        <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">{children}</main>
+        {/* Pages with a .page-wide element (Who is who) may use the full width. */}
+        <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10 has-[.page-wide]:max-w-[112rem]">{children}</main>
       </div>
     </>
   );

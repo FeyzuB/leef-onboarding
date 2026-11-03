@@ -1,6 +1,7 @@
 import type { OrgEntry, Team } from '@prisma/client';
 import { addOrgEntry, deleteOrgEntry, updateOrgEntry } from '@/app/actions/org';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { Drawer } from '@/components/Drawer';
 import { iconButtonClass } from '@/components/MoveButtons';
 import { AddForm, ConfirmButton, SubmitButton } from '@/components/forms';
@@ -107,23 +108,23 @@ function EntryActions({ entry, reports, entries, teams }: { entry: Entry; report
   );
 }
 
-/** A person as a card in the chart: avatar on top, name, job title and team. */
+/** A person as a card in the chart: avatar on top, name, job title and teams. */
 function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; tree: TreeProps }) {
   return (
     <div
       id={`person-${entry.id}`}
-      className="group relative mx-auto flex w-full max-w-[13rem] scroll-mt-24 flex-col items-center rounded-2xl border border-slate-200/80 bg-white px-3 pb-3 pt-4 text-center shadow-card transition target:border-brand-500 target:ring-2 target:ring-brand-500/30"
+      className="group relative mx-auto flex w-full max-w-[17rem] scroll-mt-24 flex-col items-center rounded-2xl border border-slate-200/80 bg-white px-4 pb-4 pt-5 text-center shadow-card transition target:border-brand-500 target:ring-2 target:ring-brand-500/30"
     >
       {tree.canEdit && (
-        <div className="absolute right-1 top-1">
+        <div className="absolute right-1.5 top-1.5">
           <EntryActions entry={entry} reports={reports} entries={tree.entries} teams={tree.teams} />
         </div>
       )}
       <Avatar name={entry.name} size="lg" />
-      <p className="mt-2 line-clamp-2 w-full break-words font-semibold text-slate-900">{entry.name}</p>
-      {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-600">{entry.jobTitle}</p>}
+      <p className="mt-2.5 line-clamp-2 w-full break-words text-base font-semibold text-slate-900">{entry.name}</p>
+      {entry.jobTitle && <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{entry.jobTitle}</p>}
       {(entry.teams.length > 0 || entry.managedTeams.length > 0) && (
-        <p className="mt-1.5 flex flex-wrap justify-center gap-1">
+        <p className="mt-2 flex flex-wrap justify-center gap-1">
           {entry.managedTeams.map((team) => (
             <Badge key={`m-${team.id}`} tone="accent">
               Manages {team.name}
@@ -142,42 +143,36 @@ function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; t
   );
 }
 
-/** A person without reports, as a compact row in a manager's team box. */
-function PersonRow({ entry, manager, tree }: { entry: Entry; manager: Entry; tree: TreeProps }) {
-  // The box already says which team its manager runs; only show teams that tell something extra:
-  // all of them when someone is in several teams, or the one team when it differs from the manager's.
-  const managerTeams = new Set([...manager.teams, ...manager.managedTeams].map((t) => t.id));
-  const showTeams = entry.teams.length > 1 || entry.teams.some((t) => !managerTeams.has(t.id));
+/** A person without reports, as a row in a team box. Only the first appearance carries the #person- anchor. */
+function PersonRow({ entry, boxTeamId, anchor, tree }: { entry: Entry; boxTeamId: string | null; anchor: boolean; tree: TreeProps }) {
+  // The box already names its team; show the person's other teams, and what they manage.
+  const otherTeams = entry.teams.filter((t) => t.id !== boxTeamId);
   return (
     <div
-      id={`person-${entry.id}`}
-      className="group relative flex scroll-mt-24 items-center gap-2.5 rounded-xl bg-white px-2.5 py-2 ring-1 ring-slate-200/80 transition target:ring-2 target:ring-brand-500"
+      id={anchor ? `person-${entry.id}` : undefined}
+      className="group relative flex scroll-mt-24 items-center gap-3 rounded-xl bg-white px-3 py-2.5 shadow-sm ring-1 ring-slate-200/80 transition target:ring-2 target:ring-brand-500"
     >
-      <Avatar name={entry.name} size="sm" />
+      <Avatar name={entry.name} />
       <div className="min-w-0 flex-1 text-left">
         <p className="line-clamp-2 break-words text-sm font-semibold text-slate-900">{entry.name}</p>
         {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-500">{entry.jobTitle}</p>}
-        {showTeams && (
-          <p className="mt-1 flex flex-wrap gap-1">
-            {entry.teams.map((team) => (
-              <Badge key={team.id} tone="brand">
-                {team.name}
-              </Badge>
-            ))}
-          </p>
-        )}
-        {entry.managedTeams.length > 0 && (
+        {(otherTeams.length > 0 || entry.managedTeams.length > 0) && (
           <p className="mt-1 flex flex-wrap gap-1">
             {entry.managedTeams.map((team) => (
-              <Badge key={team.id} tone="accent">
+              <Badge key={`m-${team.id}`} tone="accent">
                 Manages {team.name}
+              </Badge>
+            ))}
+            {otherTeams.map((team) => (
+              <Badge key={team.id} tone="brand">
+                Also {team.name}
               </Badge>
             ))}
           </p>
         )}
       </div>
       {tree.canEdit && (
-        <div className="absolute inset-y-0 right-1 flex items-center">
+        <div className="absolute inset-y-0 right-1.5 flex items-center">
           <EntryActions entry={entry} reports={0} entries={tree.entries} teams={tree.teams} />
         </div>
       )}
@@ -185,42 +180,130 @@ function PersonRow({ entry, manager, tree }: { entry: Entry; manager: Entry; tre
   );
 }
 
-const line = 'bg-brand-200';
+type Group = { key: string; teamId: string | null; label: string | null; members: Entry[] };
 
 /**
- * One person and everyone below them, top-down. Managers whose reports have no reports of their own
- * get those reports as a stacked list, so wide teams stay readable instead of one long row.
+ * A manager's reports without reports of their own, grouped by the teams the manager runs.
+ * Someone in two of those teams shows in both; reports outside them go in one extra group.
+ */
+function leafGroups(manager: Entry, leaves: Entry[]): Group[] {
+  const groups: Group[] = [];
+  const placed = new Set<string>();
+  for (const team of manager.managedTeams) {
+    const members = leaves.filter((l) => l.teams.some((t) => t.id === team.id));
+    if (!members.length) continue;
+    groups.push({ key: team.id, teamId: team.id, label: team.name, members });
+    members.forEach((m) => placed.add(m.id));
+  }
+  const rest = leaves.filter((l) => !placed.has(l.id));
+  if (rest.length) groups.push({ key: 'direct', teamId: null, label: groups.length ? 'Other direct reports' : 'Team', members: rest });
+  return groups;
+}
+
+function TeamBox({ group, anchored, tree }: { group: Group; anchored: Set<string>; tree: TreeProps }) {
+  return (
+    <section className="w-full rounded-2xl bg-brand-50/70 p-2.5 ring-1 ring-brand-100">
+      {group.label && (
+        <h4 className="mb-2 flex items-center justify-between gap-2 px-1.5 pt-0.5 text-xs font-semibold uppercase tracking-wider text-brand-800">
+          <span className="flex items-center gap-1.5">
+            <Users size={13} /> {group.label}
+          </span>
+          <span className="font-medium normal-case tracking-normal text-brand-700/70">{group.members.length}</span>
+        </h4>
+      )}
+      <ul className="space-y-2">
+        {group.members.map((member) => {
+          const anchor = !anchored.has(member.id);
+          anchored.add(member.id);
+          return (
+            <li key={member.id}>
+              <PersonRow entry={member} boxTeamId={group.teamId} anchor={anchor} tree={tree} />
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+const hasReports = (entry: Entry, tree: TreeProps) => (tree.childrenOf.get(entry.id) ?? []).length > 0;
+
+/** How many columns a person's branch needs, so wide branches get more room. */
+function units(entry: Entry, tree: TreeProps): number {
+  const reports = tree.childrenOf.get(entry.id) ?? [];
+  if (!reports.length) return 1;
+  const managers = reports.filter((r) => hasReports(r, tree));
+  const groups = leafGroups(
+    entry,
+    reports.filter((r) => !hasReports(r, tree)),
+  ).length;
+  if (!managers.length) return Math.max(1, groups);
+  return managers.reduce((n, m) => n + units(m, tree), 0) + (groups ? 1 : 0);
+}
+
+const UNIT_MIN = 13; // rem
+const UNIT_MAX = 21; // rem
+
+function columnStyle(n: number) {
+  return { flexGrow: n, flexBasis: 0, minWidth: `${n * UNIT_MIN}rem`, maxWidth: `${n * UNIT_MAX}rem` };
+}
+
+/** A column hanging from the line above it. */
+function Column({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <li
+      style={columnStyle(n)}
+      className="relative px-3 pt-7 before:absolute before:left-0 before:right-0 before:top-0 before:h-px before:bg-brand-200 after:absolute after:left-1/2 after:top-0 after:h-7 after:w-px after:bg-brand-200 first:before:left-1/2 last:before:right-1/2 only:before:hidden"
+    >
+      {children}
+    </li>
+  );
+}
+
+/**
+ * One person and everyone below them, top-down. Reports who lead others get their own branch;
+ * the rest sit in boxes per team the person manages (side by side when there is nothing else below).
  * Rendered inside an <li key={entry.id}>: keys on server components are not kept.
  */
-function Node({ entry, tree, depth }: { entry: Entry; tree: TreeProps; depth: number }) {
+function Node({ entry, tree, depth, anchored }: { entry: Entry; tree: TreeProps; depth: number; anchored: Set<string> }) {
   const reports = tree.childrenOf.get(entry.id) ?? [];
-  const leavesOnly = reports.every((r) => !(tree.childrenOf.get(r.id) ?? []).length);
+  const managers = reports.filter((r) => hasReports(r, tree));
+  const groups = leafGroups(
+    entry,
+    reports.filter((r) => !hasReports(r, tree)),
+  );
   return (
     <div className="flex w-full flex-col items-center">
       <PersonCard entry={entry} reports={reports.length} tree={tree} />
       {reports.length > 0 && depth < 20 && (
         <>
-          <div className={`h-5 w-px ${line}`} />
-          {leavesOnly ? (
-            <ul className="w-full max-w-[15rem] space-y-1.5 rounded-2xl bg-brand-50/60 p-2 ring-1 ring-brand-100">
-              {reports.map((child) => (
-                <li key={child.id}>
-                  <PersonRow entry={child} manager={entry} tree={tree} />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ul className="flex w-full justify-center">
-              {reports.map((child) => (
-                <li
-                  key={child.id}
-                  className={`relative min-w-0 max-w-[16rem] flex-1 basis-0 px-1.5 pt-5 before:absolute before:left-0 before:right-0 before:top-0 before:h-px before:bg-brand-200 after:absolute after:left-1/2 after:top-0 after:h-5 after:w-px after:bg-brand-200 first:before:left-1/2 last:before:right-1/2 only:before:hidden`}
-                >
-                  <Node entry={child} tree={tree} depth={depth + 1} />
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="h-7 w-px bg-brand-200" />
+          <ul className="flex w-full justify-center">
+            {managers.length === 0 ? (
+              groups.map((group) => (
+                <Column key={group.key} n={1}>
+                  <TeamBox group={group} anchored={anchored} tree={tree} />
+                </Column>
+              ))
+            ) : (
+              <>
+                {groups.length > 0 && (
+                  <Column n={1}>
+                    <div className="space-y-4">
+                      {groups.map((group) => (
+                        <TeamBox key={group.key} group={group} anchored={anchored} tree={tree} />
+                      ))}
+                    </div>
+                  </Column>
+                )}
+                {managers.map((child) => (
+                  <Column key={child.id} n={units(child, tree)}>
+                    <Node entry={child} tree={tree} depth={depth + 1} anchored={anchored} />
+                  </Column>
+                ))}
+              </>
+            )}
+          </ul>
         </>
       )}
     </div>
@@ -251,6 +334,8 @@ export default async function OrganogramPage() {
   const trees = withReports.length ? withReports : roots;
   const loose = withReports.length ? roots.filter((r) => !withReports.includes(r)) : [];
   const tree: TreeProps = { childrenOf, canEdit, entries, teams };
+  // Someone in two team boxes gets the #person- anchor (used by step contacts) only once.
+  const anchored = new Set<string>();
 
   return (
     <>
@@ -281,11 +366,11 @@ export default async function OrganogramPage() {
         <EmptyState>{canEdit ? 'Nobody added yet. Start with the person at the top.' : 'The organogram is still empty.'}</EmptyState>
       ) : (
         <>
-          <div className="no-scrollbar -mx-4 overflow-x-auto px-4 pb-4">
-            <ul className="flex min-w-[38rem] justify-center gap-10 py-2">
+          <div className="page-wide no-scrollbar -mx-4 overflow-x-auto px-4 pb-4">
+            <ul className="flex justify-center gap-12 py-2">
               {trees.map((entry) => (
-                <li key={entry.id} className="min-w-0 flex-1">
-                  <Node entry={entry} tree={tree} depth={0} />
+                <li key={entry.id} style={columnStyle(units(entry, tree))}>
+                  <Node entry={entry} tree={tree} depth={0} anchored={anchored} />
                 </li>
               ))}
             </ul>
@@ -294,7 +379,7 @@ export default async function OrganogramPage() {
             <section className="mt-10">
               <h2 className="mb-1 text-lg font-bold text-slate-900">Also good to know</h2>
               <p className="mb-4 text-sm text-slate-600">People outside the reporting line who you may work with.</p>
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {loose.map((entry) => (
                   <li key={entry.id}>
                     <PersonCard entry={entry} reports={0} tree={tree} />
