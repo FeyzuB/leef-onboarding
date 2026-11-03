@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, CalendarDays, Link2, Pencil, Plus, RefreshCw, Target, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Eye, Link2, Pencil, Plus, RefreshCw, Target, Trash2, UserRound } from 'lucide-react';
 import {
   addTemplateGoal,
   addTemplateStep,
@@ -70,24 +70,29 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
             </span>
           </p>
         </div>
-        <Drawer
-          key={template.title}
-          title="Rename template"
-          triggerClassName={secondaryButtonClass}
-          trigger={
-            <>
-              <Pencil size={15} /> Rename
-            </>
-          }
-        >
-          <form action={renameTemplate} className="space-y-4">
-            <input type="hidden" name="templateId" value={template.id} />
-            <Field label="Template name">
-              <input name="title" required maxLength={120} defaultValue={template.title} className={inputClass} />
-            </Field>
-            <SubmitButton>Save name</SubmitButton>
-          </form>
-        </Drawer>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/templates/${template.id}/preview`} className={secondaryButtonClass}>
+            <Eye size={15} /> View as new hire
+          </Link>
+          <Drawer
+            key={template.title}
+            title="Rename template"
+            triggerClassName={secondaryButtonClass}
+            trigger={
+              <>
+                <Pencil size={15} /> Rename
+              </>
+            }
+          >
+            <form action={renameTemplate} className="space-y-4">
+              <input type="hidden" name="templateId" value={template.id} />
+              <Field label="Template name">
+                <input name="title" required maxLength={120} defaultValue={template.title} className={inputClass} />
+              </Field>
+              <SubmitButton>Save name</SubmitButton>
+            </form>
+          </Drawer>
+        </div>
       </div>
 
       <div

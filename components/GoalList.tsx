@@ -14,12 +14,15 @@ export function GoalList({
   planId,
   canEdit = false,
   collapseAfter,
+  readOnly = false,
 }: {
   goals: Goal[];
   startDate: Date;
   planId: string;
   canEdit?: boolean;
   collapseAfter?: number;
+  /** For previews: the tick is just a circle. */
+  readOnly?: boolean;
 }) {
   if (!goals.length) return <EmptyState>No goals set yet.</EmptyState>;
   const now = new Date();
@@ -41,22 +44,26 @@ export function GoalList({
         const overdue = !done && isOverdue(due, now, APP_TIMEZONE);
         return (
           <li key={goal.id} className="flex items-start gap-3 py-3">
-            <form action={setGoalStatus} className="pt-0.5">
-              <input type="hidden" name="goalId" value={goal.id} />
-              <input type="hidden" name="status" value={done ? 'OPEN' : 'DONE'} />
-              <button
-                type="submit"
-                aria-label={done ? 'Mark goal as not reached' : 'Mark goal as reached'}
-                title={done ? 'Mark goal as not reached' : 'Mark goal as reached'}
-                className={
-                  done
-                    ? 'flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600'
-                    : 'flex h-6 w-6 items-center justify-center rounded-full border-2 border-slate-300 text-transparent transition hover:border-brand-500 hover:text-brand-500'
-                }
-              >
-                <Check size={14} strokeWidth={3} />
-              </button>
-            </form>
+            {readOnly ? (
+              <span aria-hidden className="mt-0.5 block h-6 w-6 shrink-0 rounded-full border-2 border-slate-300" />
+            ) : (
+              <form action={setGoalStatus} className="pt-0.5">
+                <input type="hidden" name="goalId" value={goal.id} />
+                <input type="hidden" name="status" value={done ? 'OPEN' : 'DONE'} />
+                <button
+                  type="submit"
+                  aria-label={done ? 'Mark goal as not reached' : 'Mark goal as reached'}
+                  title={done ? 'Mark goal as not reached' : 'Mark goal as reached'}
+                  className={
+                    done
+                      ? 'flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600'
+                      : 'flex h-6 w-6 items-center justify-center rounded-full border-2 border-slate-300 text-transparent transition hover:border-brand-500 hover:text-brand-500'
+                  }
+                >
+                  <Check size={14} strokeWidth={3} />
+                </button>
+              </form>
+            )}
             <div className="min-w-0 flex-1">
               <p className={`text-sm font-medium ${done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'}`}>{goal.title}</p>
               <p className="mt-0.5 text-xs text-slate-500">

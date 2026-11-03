@@ -48,8 +48,10 @@ export function ContactName({ contact }: { contact: ResolvedContact }) {
 }
 
 /** The round tick in front of a step: ticks it off, or opens it again. */
-export function StepCheck({ step }: { step: PlanStep }) {
+export function StepCheck({ step, readOnly = false }: { step: PlanStep; readOnly?: boolean }) {
   const done = step.status === 'DONE';
+  // Previews show the circle without a form.
+  if (readOnly) return <span aria-hidden className="block h-6 w-6 rounded-full border-2 border-slate-300 bg-white" />;
   return done ? (
     <StatusForm
       stepId={step.id}
@@ -80,11 +82,14 @@ export function StepRow({
   startDate,
   contact,
   highlight = false,
+  readOnly = false,
 }: {
   step: PlanStep;
   startDate: Date;
   contact: ResolvedContact | null;
   highlight?: boolean;
+  /** For previews: no tick, no "I'm stuck". */
+  readOnly?: boolean;
 }) {
   const done = step.status === 'DONE';
   const blocked = step.status === 'BLOCKED';
@@ -98,7 +103,7 @@ export function StepRow({
       className={`flex scroll-mt-24 gap-3 rounded-xl px-3 py-3 transition ${highlight ? 'bg-accent-50/70 ring-1 ring-accent-200' : 'hover:bg-slate-50'}`}
     >
       <div className="pt-0.5">
-        <StepCheck step={step} />
+        <StepCheck step={step} readOnly={readOnly} />
       </div>
       <details className="min-w-0 flex-1">
         <summary className="flex cursor-pointer list-none items-start gap-2">
@@ -154,7 +159,7 @@ export function StepRow({
           )}
           {done && step.doneAt && <p className="text-xs text-brand-700">Completed {formatDate(step.doneAt, APP_TIMEZONE)}</p>}
 
-          {blocked ? (
+          {readOnly ? null : blocked ? (
             <div className="rounded-lg bg-red-50 p-3 text-red-800">
               <p className="flex items-center gap-1.5 font-medium">
                 <CircleAlert size={14} /> You&apos;re stuck on this
