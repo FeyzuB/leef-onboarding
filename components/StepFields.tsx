@@ -1,0 +1,95 @@
+import { Field, inputClass } from '@/components/ui';
+import { formatLinks, toDateInput, type Link } from '@/lib/logic';
+
+type StepDefaults = {
+  module?: string;
+  title?: string;
+  explanation?: string;
+  links?: Link[];
+  contact?: string;
+  contactRole?: string | null;
+  doneWhen?: string;
+  week?: number | null;
+  dueDate?: Date | null;
+};
+
+/** The shared inputs for a template step or a plan step. Plan steps can also get a fixed date (`withDate`). */
+export function StepFields({
+  defaults = {},
+  modules,
+  listId,
+  withDate = false,
+}: {
+  defaults?: StepDefaults;
+  modules: string[];
+  listId: string;
+  withDate?: boolean;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Field label="Module" hint="Pick an existing module or type a new one">
+        <input name="module" required maxLength={120} list={listId} defaultValue={defaults.module} className={inputClass} />
+        <datalist id={listId}>
+          {modules.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
+      </Field>
+      <Field label="Title">
+        <input name="title" required maxLength={200} defaultValue={defaults.title} className={inputClass} />
+      </Field>
+      <div className="sm:col-span-2">
+        <Field label="Explanation">
+          <textarea name="explanation" rows={3} maxLength={4000} defaultValue={defaults.explanation} className={inputClass} />
+        </Field>
+      </div>
+      <div className="sm:col-span-2">
+        <Field label="Links" hint='One per line: "Label | https://…" (usually a Confluence page)'>
+          <textarea
+            name="links"
+            rows={2}
+            maxLength={4000}
+            defaultValue={defaults.links ? formatLinks(defaults.links) : ''}
+            className={`${inputClass} font-mono text-xs`}
+          />
+        </Field>
+      </div>
+      <Field label="Contact" hint="The manager or buddy shows as the name set on each plan">
+        <div className="flex gap-2">
+          <select name="contactRole" defaultValue={defaults.contactRole ?? ''} className={`${inputClass} w-auto`}>
+            <option value="">Name:</option>
+            <option value="MANAGER">The manager</option>
+            <option value="BUDDY">The buddy</option>
+          </select>
+          <input name="contact" maxLength={200} defaultValue={defaults.contact} placeholder="e.g. Eva Eigenberg (HR)" className={inputClass} />
+        </div>
+      </Field>
+      <Field label="Done when">
+        <input name="doneWhen" maxLength={500} defaultValue={defaults.doneWhen} className={inputClass} />
+      </Field>
+      <Field label="Week" hint="Week of onboarding, 1 = the first week. Leave empty for no timing.">
+        <input name="week" type="number" min={1} max={52} defaultValue={defaults.week ?? ''} className={inputClass} />
+      </Field>
+      {withDate && (
+        <Field label="Or on date" hint="A fixed date wins over the week">
+          <input name="dueDate" type="date" defaultValue={defaults.dueDate ? toDateInput(defaults.dueDate) : ''} className={inputClass} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
+export function StepLinks({ links }: { links: Link[] }) {
+  if (!links.length) return null;
+  return (
+    <ul className="mt-2 flex flex-wrap gap-2">
+      {links.map((link) => (
+        <li key={link.url}>
+          <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-700 underline hover:text-brand-800">
+            {link.label} ↗
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}

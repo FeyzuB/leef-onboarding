@@ -1,0 +1,40 @@
+stages:
+  - check
+  - build
+  - deploy
+
+default:
+  image: node:22-bullseye
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+
+variables:
+  npm_config_cache: '$CI_PROJECT_DIR/.npm'
+
+check:
+  stage: check
+  script:
+    - npm ci
+    - npx prisma generate
+    - npm run lint
+    - npm run type-check
+    - npm test
+
+build:
+  stage: build
+  script:
+    - npm ci
+    - npx prisma generate
+    - npm run build
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploy to the internal tools server is not configured yet (see README, Deploying)."
+  when: manual
+  only:
+    - main

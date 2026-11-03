@@ -1,0 +1,35 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - '${APP_PORT:-3000}:3000'
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://onboarding:${POSTGRES_PASSWORD:-onboarding}@db:5432/onboarding
+      DATABASE_URL_UNPOOLED: postgresql://onboarding:${POSTGRES_PASSWORD:-onboarding}@db:5432/onboarding
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: onboarding
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-onboarding}
+      POSTGRES_DB: onboarding
+    # Only reachable from this machine; lets `npm run dev` use the same database.
+    ports:
+      - '127.0.0.1:${DB_PORT:-5432}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U onboarding -d onboarding']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:

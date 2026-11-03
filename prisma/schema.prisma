@@ -1,0 +1,204 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Migrations need a direct (non-pooled) connection; locally this is the same database.
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum AppRole {
+  NEW_HIRE
+  LEAD
+  ADMIN
+}
+
+enum StepStatus {
+  OPEN
+  DONE
+  BLOCKED
+}
+
+// A step contact that depends on the plan: shown as the name of that plan's manager or buddy.
+enum ContactRole {
+  MANAGER
+  BUDDY
+}
+
+enum GoalStatus {
+  OPEN
+  DONE
+}
+
+model Team {
+  id         String         @id @default(uuid())
+  name       String         @unique
+  createdAt  DateTime       @default(now())
+  users      User[]
+  templates  Template[]
+  resources  TeamResource[]
+  orgEntries OrgEntry[]
+}
+
+model Role {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  templates Template[]
+}
+
+model User {
+  id                 String   @id @default(uuid())
+  name               String
+  username           String   @unique
+  passwordHash       String
+  mustChangePassword Boolean  @default(true)
+  // Bumped on password change/reset so existing sessions stop working.
+  sessionVersion     Int      @default(0)
+  appRole            AppRole  @default(NEW_HIRE)
+  active             Boolean  @default(true)
+  teamId             String?
+  team               Team?    @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  plan               Plan?    @relation("PlanNewHire")
+  ledPlans           Plan[]   @relation("PlanLead")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Template {
+  id        String         @id @default(uuid())
+  title     String
+  teamId    String
+  team      Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role           @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  // Bumped on every content change; plans with a lower templateVersion are behind.
+  version   Int            @default(1)
+  steps     TemplateStep[]
+  goals     TemplateGoal[]
+  plans     Plan[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([teamId, roleId])
+}
+
+model TemplateStep {
+  id          String       @id @default(uuid())
+  templateId  String
+  template    Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  module      String
+  position    Int
+  title       String
+  explanation String       @default("")
+  links       Json         @default("[]")
+  contact     String       @default("")
+  contactRole ContactRole?
+  doneWhen    String       @default("")
+  // The week of onboarding the step belongs to (1 = the first week); null = no timing.
+  week        Int?
+  planSteps   PlanStep[]
+}
+
+model TemplateGoal {
+  id          String   @id @default(uuid())
+  templateId  String
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  position    Int
+  title       String
+  withinWeeks Int?
+  planGoals   Goal[]
+}
+
+model Plan {
+  id              String     @id @default(uuid())
+  newHireId       String     @unique
+  newHire         User       @relation("PlanNewHire", fields: [newHireId], references: [id], onDelete: Cascade)
+  leadId          String?
+  lead            User?      @relation("PlanLead", fields: [leadId], references: [id], onDelete: SetNull)
+  templateId      String?
+  template        Template?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateVersion Int        @default(0)
+  startDate       DateTime
+  // The new hire's manager and buddy, from Who is who; steps with a contact role show their names.
+  managerId       String?
+  manager         OrgEntry?  @relation("PlanManager", fields: [managerId], references: [id], onDelete: SetNull)
+  buddyId         String?
+  buddy           OrgEntry?  @relation("PlanBuddy", fields: [buddyId], references: [id], onDelete: SetNull)
+  steps           PlanStep[]
+  goals           Goal[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model PlanStep {
+  id             String        @id @default(uuid())
+  planId         String
+  plan           Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  // Set when the step was copied from a template.
+  templateStepId String?
+  templateStep   TemplateStep? @relation(fields: [templateStepId], references: [id], onDelete: SetNull)
+  // True when the lead added or edited this step; template pushes leave it alone.
+  tailored       Boolean       @default(false)
+  // Template steps the lead removed are hidden, not deleted, so a push does not bring them back.
+  removed        Boolean       @default(false)
+  module         String
+  position       Int
+  title          String
+  explanation    String        @default("")
+  links          Json          @default("[]")
+  contact        String        @default("")
+  contactRole    ContactRole?
+  doneWhen       String        @default("")
+  week           Int?
+  // A fixed date set by the lead; wins over the week.
+  dueDate        DateTime?
+  status         StepStatus    @default(OPEN)
+  note           String        @default("")
+  doneAt         DateTime?
+}
+
+model Goal {
+  id             String        @id @default(uuid())
+  planId         String
+  plan           Plan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  // Set when the goal was copied from a template; tailored and removed work as for plan steps.
+  templateGoalId String?
+  templateGoal   TemplateGoal? @relation(fields: [templateGoalId], references: [id], onDelete: SetNull)
+  tailored       Boolean       @default(false)
+  removed        Boolean       @default(false)
+  title          String
+  targetDate     DateTime?
+  withinWeeks    Int?
+  status         GoalStatus    @default(OPEN)
+  doneAt         DateTime?
+  createdAt      DateTime      @default(now())
+}
+
+model TeamResource {
+  id       String @id @default(uuid())
+  teamId   String
+  team     Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  position Int
+  title    String
+  location String
+  note     String @default("")
+  url      String @default("")
+}
+
+model OrgEntry {
+  id          String     @id @default(uuid())
+  name        String
+  jobTitle    String     @default("")
+  teamId      String?
+  team        Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  reportsToId String?
+  reportsTo   OrgEntry?  @relation("ReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports     OrgEntry[] @relation("ReportsTo")
+  managerOf   Plan[]     @relation("PlanManager")
+  buddyOf     Plan[]     @relation("PlanBuddy")
+  createdAt   DateTime   @default(now())
+}
