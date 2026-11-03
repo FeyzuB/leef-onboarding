@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, CircleAlert, Clock, Pencil, Plus, RefreshCw, Settings, Target, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CircleAlert, Clock, Pencil, Plus, RefreshCw, Settings, Target, Trash2, UserRound } from 'lucide-react';
 import {
   addGoal,
   addPlanStep,
@@ -41,6 +41,8 @@ import {
   currentWeek,
   formatDate,
   groupByModule,
+  groupByPhase,
+  currentPhase,
   isOverdue,
   nextStep,
   planStats,
@@ -52,9 +54,12 @@ import {
   toLinks,
 } from '@/lib/logic';
 import { prisma } from '@/lib/prisma';
+import { ViewSwitch, stepView } from '@/components/ViewSwitch';
+import type { OrgEntry, PlanStep } from '@prisma/client';
 
-export default async function PlanEditorPage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+export default async function PlanEditorPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
+  const view = stepView(searchParams.view);
   const actor = await requireLead();
   const plan = await prisma.plan.findUnique({
     where: { id: params.id },
@@ -77,6 +82,8 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
   const removedGoals = plan.goals.filter((g) => g.removed);
   const groups = groupByModule(visible);
   const modules = groups.map((g) => g.module);
+  const phases = groupByPhase(visible, plan.startDate);
+  const nowPhase = currentPhase(plan.startDate, now, APP_TIMEZONE);
   const stats = planStats(plan, now, APP_TIMEZONE);
   const behind = plan.template && plan.templateVersion < plan.template.version;
   const next = nextStep(
@@ -235,7 +242,10 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
       </div>
 
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">Steps</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Steps</h2>
+          <ViewSwitch href={`/plans/${plan.id}`} view={view} />
+        </div>
         <Drawer
           wide
           key={`steps-${plan.steps.length}`}
@@ -257,86 +267,80 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
 
       {groups.length === 0 && <EmptyState>This plan has no steps yet. Add the first one.</EmptyState>}
       <ol className="space-y-4">
-        {groups.map((group, index) => {
-          const doneInGroup = group.items.filter((s) => s.status === 'DONE').length;
-          return (
-            <li key={group.module} className="rounded-2xl border border-slate-200/80 bg-white shadow-card">
-              <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700 ring-1 ring-brand-200">
-                  {index + 1}
-                </span>
-                <h3 className="min-w-0 flex-1 font-semibold text-slate-900">{group.module}</h3>
-                <span className="text-xs font-medium text-slate-500">
-                  {doneInGroup}/{group.items.length}
-                </span>
-                <div className="flex">
-                  <MoveButtons action={movePlanModule} fields={{ planId: plan.id, module: group.module }} />
-                </div>
-              </div>
-              <ol className="divide-y divide-slate-100">
-                {group.items.map((step) => {
-                  const done = step.status === 'DONE';
-                  const contact = resolveContact(step, plan, people);
-                  const timing = stepTimingLabel(step, plan.startDate);
-                  const late = !done && isOverdue(stepDueDate(step, plan.startDate), now, APP_TIMEZONE);
-                  return (
-                    <li
-                      key={step.id}
-                      id={`step-${step.id}`}
-                      className={`flex items-start gap-3 px-4 py-3 sm:px-5 ${step.id === next?.id ? 'bg-accent-50/60' : ''}`}
+        {view === 'time'
+          ? phases.map((phase) => {
+              const doneInPhase = phase.items.filter((s) => s.status === 'DONE').length;
+              const isNow = phase.key === nowPhase;
+              return (
+                <li
+                  key={phase.key}
+                  className={`rounded-2xl border bg-white shadow-card ${isNow ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200/80'}`}
+                >
+                  <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isNow ? 'bg-accent-500 text-white' : 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'}`}
                     >
-                      <div className="pt-0.5">
-                        <StepCheck step={step} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`font-medium ${done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'}`}>{step.title}</p>
-                        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                          {timing && <span className={late ? 'font-medium text-amber-700' : ''}>{timing}</span>}
-                          {contact && (
-                            <span className="inline-flex items-center gap-1">
-                              <UserRound size={12} /> {contact.text}
-                            </span>
-                          )}
-                          {step.tailored ? <Badge tone="accent">Tailored</Badge> : step.templateStepId && <Badge>From template</Badge>}
-                          {step.status === 'BLOCKED' && <Badge tone="red">Stuck: {step.note || 'no note'}</Badge>}
-                          {late && <Badge tone="amber">Overdue</Badge>}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 items-center">
-                        <MoveButtons action={movePlanStep} fields={{ planId: plan.id, stepId: step.id }} />
-                        <Drawer
-                          wide
-                          key={stepVersion(step)}
-                          title="Edit step"
-                          triggerClassName={iconButtonClass}
-                          triggerLabel="Edit step"
-                          trigger={<Pencil size={15} />}
-                        >
-                          <form action={updatePlanStep} className="space-y-4">
-                            <input type="hidden" name="planId" value={plan.id} />
-                            <input type="hidden" name="stepId" value={step.id} />
-                            <StepFields withDate listId={`modules-${step.id}`} modules={modules} defaults={{ ...step, links: toLinks(step.links) }} />
-                            <SubmitButton>Save step</SubmitButton>
-                          </form>
-                        </Drawer>
-                        <form action={removePlanStep}>
-                          <input type="hidden" name="planId" value={plan.id} />
-                          <input type="hidden" name="stepId" value={step.id} />
-                          <ConfirmButton
-                            message={`Remove “${step.title}” from this plan?`}
-                            className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                          >
-                            <Trash2 size={15} aria-label="Remove step" />
-                          </ConfirmButton>
-                        </form>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            </li>
-          );
-        })}
+                      <CalendarDays size={15} />
+                    </span>
+                    <h3 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 font-semibold text-slate-900">
+                      {phase.label}
+                      {phase.dates && <span className="text-sm font-normal text-slate-500">· {phase.dates}</span>}
+                      {isNow && <Badge tone="accent">Now</Badge>}
+                    </h3>
+                    <span className="text-xs font-medium text-slate-500">
+                      {doneInPhase}/{phase.items.length}
+                    </span>
+                  </div>
+                  <ol className="divide-y divide-slate-100">
+                    {phase.items.map((step) => (
+                      <PlanStepItem
+                        key={step.id}
+                        step={step}
+                        plan={plan}
+                        people={people}
+                        modules={modules}
+                        now={now}
+                        isNext={step.id === next?.id}
+                        showModule
+                      />
+                    ))}
+                  </ol>
+                </li>
+              );
+            })
+          : groups.map((group, index) => {
+              const doneInGroup = group.items.filter((s) => s.status === 'DONE').length;
+              return (
+                <li key={group.module} className="rounded-2xl border border-slate-200/80 bg-white shadow-card">
+                  <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700 ring-1 ring-brand-200">
+                      {index + 1}
+                    </span>
+                    <h3 className="min-w-0 flex-1 font-semibold text-slate-900">{group.module}</h3>
+                    <span className="text-xs font-medium text-slate-500">
+                      {doneInGroup}/{group.items.length}
+                    </span>
+                    <div className="flex">
+                      <MoveButtons action={movePlanModule} fields={{ planId: plan.id, module: group.module }} />
+                    </div>
+                  </div>
+                  <ol className="divide-y divide-slate-100">
+                    {group.items.map((step) => (
+                      <PlanStepItem
+                        key={step.id}
+                        step={step}
+                        plan={plan}
+                        people={people}
+                        modules={modules}
+                        now={now}
+                        isNext={step.id === next?.id}
+                        movable
+                      />
+                    ))}
+                  </ol>
+                </li>
+              );
+            })}
       </ol>
 
       {removed.length + removedGoals.length > 0 && (
@@ -380,5 +384,83 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
         </form>
       </Card>
     </>
+  );
+}
+
+type PlanForStep = { id: string; startDate: Date; manager: Pick<OrgEntry, 'id' | 'name'> | null; buddy: Pick<OrgEntry, 'id' | 'name'> | null };
+
+/** One plan step for the lead: tick, timing, contact and badges, with edit, remove and (in the subject view) move. */
+function PlanStepItem({
+  step,
+  plan,
+  people,
+  modules,
+  now,
+  isNext,
+  movable = false,
+  showModule = false,
+}: {
+  step: PlanStep;
+  plan: PlanForStep;
+  people: Pick<OrgEntry, 'id' | 'name'>[];
+  modules: string[];
+  now: Date;
+  isNext: boolean;
+  movable?: boolean;
+  showModule?: boolean;
+}) {
+  const done = step.status === 'DONE';
+  const contact = resolveContact(step, plan, people);
+  const timing = stepTimingLabel(step, plan.startDate);
+  const late = !done && isOverdue(stepDueDate(step, plan.startDate), now, APP_TIMEZONE);
+  return (
+    <li id={`step-${step.id}`} className={`flex items-start gap-3 px-4 py-3 sm:px-5 ${isNext ? 'bg-accent-50/60' : ''}`}>
+      <div className="pt-0.5">
+        <StepCheck step={step} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className={`font-medium ${done ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-900'}`}>{step.title}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          {showModule && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">{step.module}</span>}
+          {timing && <span className={late ? 'font-medium text-amber-700' : ''}>{timing}</span>}
+          {contact && (
+            <span className="inline-flex items-center gap-1">
+              <UserRound size={12} /> {contact.text}
+            </span>
+          )}
+          {step.tailored ? <Badge tone="accent">Tailored</Badge> : step.templateStepId && <Badge>From template</Badge>}
+          {step.status === 'BLOCKED' && <Badge tone="red">Stuck: {step.note || 'no note'}</Badge>}
+          {late && <Badge tone="amber">Overdue</Badge>}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center">
+        {movable && <MoveButtons action={movePlanStep} fields={{ planId: plan.id, stepId: step.id }} />}
+        <Drawer
+          wide
+          key={stepVersion(step)}
+          title="Edit step"
+          triggerClassName={iconButtonClass}
+          triggerLabel="Edit step"
+          trigger={<Pencil size={15} />}
+        >
+          <form action={updatePlanStep} className="space-y-4">
+            <input type="hidden" name="planId" value={plan.id} />
+            <input type="hidden" name="stepId" value={step.id} />
+            <StepFields withDate listId={`modules-${step.id}`} modules={modules} defaults={{ ...step, links: toLinks(step.links) }} />
+            <SubmitButton>Save step</SubmitButton>
+          </form>
+        </Drawer>
+        <form action={removePlanStep}>
+          <input type="hidden" name="planId" value={plan.id} />
+          <input type="hidden" name="stepId" value={step.id} />
+          <ConfirmButton
+            message={`Remove “${step.title}” from this plan?`}
+            className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 size={15} aria-label="Remove step" />
+          </ConfirmButton>
+        </form>
+      </div>
+    </li>
   );
 }

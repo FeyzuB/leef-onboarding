@@ -20,6 +20,10 @@ import {
   toLinks,
   todayInput,
   weekOf,
+  groupByPhase,
+  currentPhase,
+  stepPhase,
+  templateTimingLabel,
 } from '../lib/logic.ts';
 
 const steps = [
@@ -198,4 +202,50 @@ test('next step and this week follow the dates, not the plan order', () => {
     ['course', 'thursday', 'week1'],
   );
   assert.equal(nextStep([step('a'), step('b')], start).id, 'a', 'without timing the plan order decides');
+});
+
+test('day 1 timing: week 0 is the start date itself', () => {
+  const start = parseDateInput('2026-11-02');
+  const day1 = { week: 0, dueDate: null };
+  assert.equal(stepDueDate(day1, start).toISOString().slice(0, 10), '2026-11-02');
+  assert.equal(stepTimingLabel(day1, start), 'Day 1 · 2 Nov');
+  assert.equal(templateTimingLabel(day1), 'Day 1');
+  assert.equal(templateTimingLabel({ week: 3 }), 'Week 3');
+});
+
+test('steps fall into time phases', () => {
+  const start = parseDateInput('2026-11-02');
+  const at = (w) => stepPhase({ week: w, dueDate: null }, start);
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 8, 9, 13, 14, 26, null].map(at), [
+    'day1', 'week1', 'week2', 'weeks3-4', 'weeks3-4', 'month2', 'month2', 'month3', 'month3', 'later', 'later', 'anytime',
+  ]);
+  assert.equal(stepPhase({ week: null, dueDate: parseDateInput('2026-11-02') }, start), 'day1');
+  assert.equal(stepPhase({ week: null, dueDate: parseDateInput('2026-11-06') }, start), 'week1');
+  assert.equal(stepPhase({ week: 1, dueDate: parseDateInput('2026-11-20') }, start), 'weeks3-4');
+});
+
+test('phases group and order steps, with dates for the start date', () => {
+  const start = parseDateInput('2026-11-02');
+  const s = (id, module, position, week, dueDate = null) => ({ id, module, position, week, dueDate: dueDate && parseDateInput(dueDate) });
+  const groups = groupByPhase(
+    [s('a', 'Tools', 0, 2), s('b', 'Dag 1', 1, 0), s('c', 'LEEF', 2, null), s('d', 'Tools', 3, 1), s('e', 'HR', 4, null, '2026-11-03'), s('f', 'LEEF', 5, 6)],
+    start,
+  );
+  assert.deepEqual(groups.map((g) => [g.label, g.dates, g.items.map((i) => i.id).join('')]), [
+    ['Day 1', 'Mon 2 Nov', 'b'],
+    ['Week 1', '2–8 Nov', 'ed'],
+    ['Week 2', '9–15 Nov', 'a'],
+    ['Month 2', '30 Nov – 27 Dec', 'f'],
+    ['Anytime', null, 'c'],
+  ]);
+});
+
+test('the current phase follows today', () => {
+  const start = parseDateInput('2026-11-02');
+  const on = (d) => currentPhase(start, new Date(`${d}T10:00:00Z`));
+  assert.equal(on('2026-10-30'), 'day1');
+  assert.equal(on('2026-11-02'), 'day1');
+  assert.equal(on('2026-11-03'), 'week1');
+  assert.equal(on('2026-11-17'), 'weeks3-4');
+  assert.equal(on('2027-03-01'), 'later');
 });

@@ -33,13 +33,19 @@ import {
   smallButtonClass,
 } from '@/components/ui';
 import { inScope, requireLead } from '@/lib/auth';
-import { groupByModule, stepVersion, templateContact, toLinks } from '@/lib/logic';
+import { groupByModule, groupByPhase, stepVersion, templateContact, templateTimingLabel, toLinks } from '@/lib/logic';
+import { ViewSwitch, stepView } from '@/components/ViewSwitch';
+import type { TemplateStep } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 const deleteIconClass = 'rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600';
 
-export default async function TemplateEditorPage(props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
+// Templates have no start date; any date works for ordering steps into phases.
+const NO_START = new Date(0);
+
+export default async function TemplateEditorPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
+  const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
+  const view = stepView(searchParams.view);
   const actor = await requireLead();
   const template = await prisma.template.findUnique({
     where: { id: params.id },
@@ -49,6 +55,11 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
 
   const groups = groupByModule(template.steps);
   const modules = groups.map((g) => g.module);
+  const phases = groupByPhase(
+    template.steps.map((step) => ({ ...step, dueDate: null })),
+    NO_START,
+    false,
+  );
   const behind = template.plans.filter((p) => p.templateVersion < template.version).length;
   const goals = [...template.goals].sort((a, b) => (a.withinWeeks ?? Infinity) - (b.withinWeeks ?? Infinity) || a.position - b.position);
 
@@ -113,7 +124,10 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
       </div>
 
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">Steps</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Steps</h2>
+          <ViewSwitch href={`/templates/${template.id}`} view={view} />
+        </div>
         <Drawer
           wide
           key={`steps-${template.steps.length}`}
@@ -134,94 +148,64 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
       </div>
 
       {groups.length === 0 && <EmptyState>No steps yet. Add the first one.</EmptyState>}
+      {view === 'time' && groups.length > 0 && (
+        <p className="-mt-1 mb-4 text-sm text-slate-500">
+          The order a new hire follows, by each step&apos;s timing. To move steps by hand, switch to &ldquo;By subject&rdquo;.
+        </p>
+      )}
       <ol className="space-y-4">
-        {groups.map((group, index) => (
-          <li key={group.module} className="rounded-2xl border border-slate-200/80 bg-white shadow-card">
-            <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700 ring-1 ring-brand-200">
-                {index + 1}
-              </span>
-              <h3 className="min-w-0 flex-1 font-semibold text-slate-900">{group.module}</h3>
-              <span className="text-xs font-medium text-slate-500">{group.items.length} steps</span>
-              <div className="flex items-center">
-                <MoveButtons action={moveTemplateModule} fields={{ templateId: template.id, module: group.module }} />
-                <Drawer
-                  key={group.module}
-                  title="Rename module"
-                  triggerClassName={iconButtonClass}
-                  triggerLabel="Rename module"
-                  trigger={<Pencil size={15} />}
-                >
-                  <form action={renameTemplateModule} className="space-y-4">
-                    <input type="hidden" name="templateId" value={template.id} />
-                    <input type="hidden" name="module" value={group.module} />
-                    <Field label="Module name">
-                      <input name="newModule" required maxLength={120} defaultValue={group.module} className={inputClass} />
-                    </Field>
-                    <SubmitButton>Save name</SubmitButton>
-                  </form>
-                </Drawer>
-              </div>
-            </div>
-            <ol className="divide-y divide-slate-100">
-              {group.items.map((step) => {
-                const links = toLinks(step.links);
-                const contact = templateContact(step);
-                return (
-                  <li key={step.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-slate-900">{step.title}</p>
-                      {step.explanation && <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{toPlainText(step.explanation)}</p>}
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                        {step.week != null && (
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarDays size={12} /> Week {step.week}
-                          </span>
-                        )}
-                        {contact && (
-                          <span className="inline-flex items-center gap-1">
-                            <UserRound size={12} /> {contact}
-                          </span>
-                        )}
-                        {links.length > 0 && (
-                          <span className="inline-flex items-center gap-1">
-                            <Link2 size={12} /> {links.length} link{links.length === 1 ? '' : 's'}
-                          </span>
-                        )}
-                        {step.doneWhen && <span>Done when: {step.doneWhen}</span>}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center">
-                      <MoveButtons action={moveTemplateStep} fields={{ templateId: template.id, stepId: step.id }} />
-                      <Drawer
-                        wide
-                        key={stepVersion(step)}
-                        title="Edit step"
-                        triggerClassName={iconButtonClass}
-                        triggerLabel="Edit step"
-                        trigger={<Pencil size={15} />}
-                      >
-                        <form action={updateTemplateStep} className="space-y-4">
-                          <input type="hidden" name="templateId" value={template.id} />
-                          <input type="hidden" name="stepId" value={step.id} />
-                          <StepFields listId={`modules-${step.id}`} modules={modules} defaults={{ ...step, links }} />
-                          <SubmitButton>Save step</SubmitButton>
-                        </form>
-                      </Drawer>
-                      <form action={deleteTemplateStep}>
+        {view === 'time'
+          ? phases.map((phase) => (
+              <li key={phase.key} className="rounded-2xl border border-slate-200/80 bg-white shadow-card">
+                <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 ring-1 ring-brand-200">
+                    <CalendarDays size={15} />
+                  </span>
+                  <h3 className="min-w-0 flex-1 font-semibold text-slate-900">{phase.label}</h3>
+                  <span className="text-xs font-medium text-slate-500">{phase.items.length} steps</span>
+                </div>
+                <ol className="divide-y divide-slate-100">
+                  {phase.items.map((step) => (
+                    <StepItem key={step.id} step={step} templateId={template.id} modules={modules} showModule />
+                  ))}
+                </ol>
+              </li>
+            ))
+          : groups.map((group, index) => (
+              <li key={group.module} className="rounded-2xl border border-slate-200/80 bg-white shadow-card">
+                <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700 ring-1 ring-brand-200">
+                    {index + 1}
+                  </span>
+                  <h3 className="min-w-0 flex-1 font-semibold text-slate-900">{group.module}</h3>
+                  <span className="text-xs font-medium text-slate-500">{group.items.length} steps</span>
+                  <div className="flex items-center">
+                    <MoveButtons action={moveTemplateModule} fields={{ templateId: template.id, module: group.module }} />
+                    <Drawer
+                      key={group.module}
+                      title="Rename module"
+                      triggerClassName={iconButtonClass}
+                      triggerLabel="Rename module"
+                      trigger={<Pencil size={15} />}
+                    >
+                      <form action={renameTemplateModule} className="space-y-4">
                         <input type="hidden" name="templateId" value={template.id} />
-                        <input type="hidden" name="stepId" value={step.id} />
-                        <ConfirmButton message={`Delete “${step.title}” from the template?`} className={deleteIconClass}>
-                          <Trash2 size={15} aria-label="Delete step" />
-                        </ConfirmButton>
+                        <input type="hidden" name="module" value={group.module} />
+                        <Field label="Module name">
+                          <input name="newModule" required maxLength={120} defaultValue={group.module} className={inputClass} />
+                        </Field>
+                        <SubmitButton>Save name</SubmitButton>
                       </form>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </li>
-        ))}
+                    </Drawer>
+                  </div>
+                </div>
+                <ol className="divide-y divide-slate-100">
+                  {group.items.map((step) => (
+                    <StepItem key={step.id} step={step} templateId={template.id} modules={modules} movable />
+                  ))}
+                </ol>
+              </li>
+            ))}
       </ol>
 
       <Card className="mt-10">
@@ -315,5 +299,76 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
         </form>
       </Card>
     </>
+  );
+}
+
+/** One template step: what it says, its timing and who to ask, with edit, delete and (in the subject view) move. */
+function StepItem({
+  step,
+  templateId,
+  modules,
+  movable = false,
+  showModule = false,
+}: {
+  step: TemplateStep;
+  templateId: string;
+  modules: string[];
+  movable?: boolean;
+  showModule?: boolean;
+}) {
+  const links = toLinks(step.links);
+  const contact = templateContact(step);
+  const timing = templateTimingLabel(step);
+  return (
+    <li className="flex items-start gap-3 px-4 py-3 sm:px-5">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-slate-900">{step.title}</p>
+        {step.explanation && <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{toPlainText(step.explanation)}</p>}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          {showModule && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">{step.module}</span>}
+          {timing && (
+            <span className="inline-flex items-center gap-1">
+              <CalendarDays size={12} /> {timing}
+            </span>
+          )}
+          {contact && (
+            <span className="inline-flex items-center gap-1">
+              <UserRound size={12} /> {contact}
+            </span>
+          )}
+          {links.length > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Link2 size={12} /> {links.length} link{links.length === 1 ? '' : 's'}
+            </span>
+          )}
+          {step.doneWhen && <span>Done when: {step.doneWhen}</span>}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center">
+        {movable && <MoveButtons action={moveTemplateStep} fields={{ templateId, stepId: step.id }} />}
+        <Drawer
+          wide
+          key={stepVersion(step)}
+          title="Edit step"
+          triggerClassName={iconButtonClass}
+          triggerLabel="Edit step"
+          trigger={<Pencil size={15} />}
+        >
+          <form action={updateTemplateStep} className="space-y-4">
+            <input type="hidden" name="templateId" value={templateId} />
+            <input type="hidden" name="stepId" value={step.id} />
+            <StepFields listId={`modules-${step.id}`} modules={modules} defaults={{ ...step, links }} />
+            <SubmitButton>Save step</SubmitButton>
+          </form>
+        </Drawer>
+        <form action={deleteTemplateStep}>
+          <input type="hidden" name="templateId" value={templateId} />
+          <input type="hidden" name="stepId" value={step.id} />
+          <ConfirmButton message={`Delete “${step.title}” from the template?`} className={deleteIconClass}>
+            <Trash2 size={15} aria-label="Delete step" />
+          </ConfirmButton>
+        </form>
+      </div>
+    </li>
   );
 }

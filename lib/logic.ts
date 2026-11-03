@@ -189,6 +189,7 @@ export function isOverdue(due: Date | null, now: Date, timeZone = 'UTC'): boolea
 
 // ---------- Step timing ----------
 
+/** `week` 0 means the first day; 1 and up are onboarding weeks; null is no timing. */
 export type StepTiming = { week: number | null; dueDate: Date | null };
 
 /** First and last day of onboarding week N (week 1 starts on the start date). */
@@ -207,9 +208,10 @@ export function currentWeek(startDate: Date, now: Date, timeZone = 'UTC'): numbe
   return weekOf(parseDateInput(todayInput(now, timeZone))!, startDate);
 }
 
-/** A fixed date wins; otherwise the last day of the step's week. */
+/** A fixed date wins; otherwise the last day of the step's week (the start date itself for day 1). */
 export function stepDueDate(step: StepTiming, startDate: Date): Date | null {
   if (step.dueDate) return step.dueDate;
+  if (step.week === 0) return startDate;
   if (step.week != null) return weekRange(startDate, step.week).to;
   return null;
 }
@@ -217,7 +219,7 @@ export function stepDueDate(step: StepTiming, startDate: Date): Date | null {
 /** The week a step is planned in: its own week, or the week its fixed date falls in. */
 export function stepWeek(step: StepTiming, startDate: Date): number | null {
   if (step.dueDate) return weekOf(step.dueDate, startDate);
-  return step.week;
+  return step.week === 0 ? 1 : step.week;
 }
 
 /** Short label such as "Week 2 · 9–15 Nov" or "On 3 Nov", or null for a step without timing. */
@@ -225,9 +227,80 @@ export function stepTimingLabel(step: StepTiming, startDate: Date): string | nul
   const short = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   if (step.dueDate) return `On ${short(step.dueDate)}`;
   if (step.week == null) return null;
+  if (step.week === 0) return `Day 1 · ${short(startDate)}`;
   const { from, to } = weekRange(startDate, step.week);
   const sameMonth = from.getUTCMonth() === to.getUTCMonth();
   return `Week ${step.week} · ${sameMonth ? from.getUTCDate() : short(from)}–${short(to)}`;
+}
+
+/** How a step's timing reads on a template, where there is no start date: "Day 1", "Week 3" or null. */
+export function templateTimingLabel(step: { week: number | null }): string | null {
+  if (step.week == null) return null;
+  return step.week === 0 ? 'Day 1' : `Week ${step.week}`;
+}
+
+// ---------- Time phases ----------
+
+/**
+ * The journey in time: what a new hire reads as "where am I". Weeks bundle into wider phases further out.
+ * Steps without timing go to "Anytime".
+ */
+export const PHASES = [
+  { key: 'day1', label: 'Day 1', from: 0, to: 0 },
+  { key: 'week1', label: 'Week 1', from: 1, to: 1 },
+  { key: 'week2', label: 'Week 2', from: 2, to: 2 },
+  { key: 'weeks3-4', label: 'Weeks 3–4', from: 3, to: 4 },
+  { key: 'month2', label: 'Month 2', from: 5, to: 8 },
+  { key: 'month3', label: 'Month 3', from: 9, to: 13 },
+  { key: 'later', label: 'Later', from: 14, to: Infinity },
+  { key: 'anytime', label: 'Anytime', from: null, to: null },
+] as const;
+export type PhaseKey = (typeof PHASES)[number]['key'];
+export type PhaseGroup<T> = { key: PhaseKey; label: string; dates: string | null; items: T[] };
+
+function phaseForWeek(week: number): PhaseKey {
+  if (week <= 0) return 'day1';
+  return PHASES.find((p) => p.from != null && p.from >= 1 && week >= p.from && week <= p.to)!.key;
+}
+
+/** The phase a step belongs to. A fixed date on the start date (or before) counts as day 1. */
+export function stepPhase(step: StepTiming, startDate: Date): PhaseKey {
+  if (step.dueDate) return step.dueDate.getTime() <= startDate.getTime() ? 'day1' : phaseForWeek(Math.max(1, weekOf(step.dueDate, startDate)));
+  if (step.week == null) return 'anytime';
+  return phaseForWeek(step.week);
+}
+
+/** The phase today falls in: day 1 on (or before) the start date, then by week. */
+export function currentPhase(startDate: Date, now: Date, timeZone = 'UTC'): PhaseKey {
+  const today = parseDateInput(todayInput(now, timeZone))!;
+  if (today.getTime() <= startDate.getTime()) return 'day1';
+  return phaseForWeek(weekOf(today, startDate));
+}
+
+/** The dates a phase covers for a start date, e.g. "2–8 Nov" or "30 Nov – 27 Dec"; null for open-ended phases. */
+export function phaseDates(key: PhaseKey, startDate: Date): string | null {
+  const phase = PHASES.find((p) => p.key === key)!;
+  const short = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  if (key === 'day1') return startDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  if (phase.from == null || phase.to === Infinity) return null;
+  const from = weekRange(startDate, phase.from).from;
+  const to = weekRange(startDate, phase.to).to;
+  const sameMonth = from.getUTCMonth() === to.getUTCMonth();
+  return sameMonth ? `${from.getUTCDate()}–${short(to)}` : `${short(from)} – ${short(to)}`;
+}
+
+/** Steps grouped into time phases, in phase order; within a phase by due date, then plan order. Empty phases are left out. */
+export function groupByPhase<T extends StepTiming & Positioned>(steps: T[], startDate: Date, withDates = true): PhaseGroup<T>[] {
+  const ordered = byDueDate(
+    [...steps].sort((a, b) => a.position - b.position),
+    startDate,
+  );
+  return PHASES.map((phase) => ({
+    key: phase.key,
+    label: phase.label,
+    dates: withDates ? phaseDates(phase.key, startDate) : null,
+    items: ordered.filter((s) => stepPhase(s, startDate) === phase.key),
+  })).filter((g) => g.items.length > 0);
 }
 
 /** Steps by due date, earliest first; steps without timing keep their plan order, after the dated ones. */

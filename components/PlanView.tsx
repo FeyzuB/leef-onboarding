@@ -2,14 +2,26 @@ import { ArrowRight, CalendarDays, CheckCircle2, ChevronRight, Target } from 'lu
 import type { Goal, OrgEntry, PlanStep } from '@prisma/client';
 import { GoalList } from '@/components/GoalList';
 import { StepCheck, StepRow } from '@/components/StepRow';
-import { Avatar, Card, CardTitle, EmptyState, ProgressBar, ProgressRing } from '@/components/ui';
+import { Avatar, Badge, Card, CardTitle, EmptyState, ProgressBar, ProgressRing } from '@/components/ui';
 import { APP_TIMEZONE } from '@/lib/config';
-import { currentWeek, formatDate, groupByModule, nextStep, planStats, resolveContact, stepTimingLabel, thisWeekSteps } from '@/lib/logic';
+import {
+  PHASES,
+  currentPhase,
+  currentWeek,
+  formatDate,
+  groupByPhase,
+  nextStep,
+  planStats,
+  resolveContact,
+  stepTimingLabel,
+  thisWeekSteps,
+} from '@/lib/logic';
 
 type Person = Pick<OrgEntry, 'id' | 'name'>;
 
 /**
- * What a new hire sees of their plan: welcome, "This week", goals and the journey by module.
+ * What a new hire sees of their plan: welcome, "This week", goals and the journey in time phases
+ * (Day 1, Week 1, …), with each step's subject as a small label.
  * Used for My plan, and read-only for the lead's "View as new hire" preview of a template.
  */
 export function PlanView({
@@ -38,8 +50,11 @@ export function PlanView({
   readOnly?: boolean;
 }) {
   const stats = planStats({ steps, goals, startDate }, now, APP_TIMEZONE);
-  const groups = groupByModule(steps);
+  const groups = groupByPhase(steps, startDate);
   const ordered = groups.flatMap((g) => g.items);
+  const order = (key: string) => PHASES.findIndex((p) => p.key === key);
+  const nowPhase = order(currentPhase(startDate, now, APP_TIMEZONE));
+  const timedLeft = groups.some((g) => g.key !== 'anytime' && g.items.some((s) => s.status !== 'DONE'));
   const next = nextStep(ordered, startDate);
   const thisWeek = thisWeekSteps(ordered, startDate, now, APP_TIMEZONE);
   const hasTiming = ordered.some((s) => s.week != null || s.dueDate);
@@ -135,23 +150,33 @@ export function PlanView({
       <h2 className="mb-4 text-xl font-bold tracking-tight text-slate-900">Your journey</h2>
       {groups.length === 0 && <EmptyState>Your plan has no steps yet.</EmptyState>}
       <ol className="space-y-4">
-        {groups.map((group, index) => {
+        {groups.map((group) => {
           const doneInGroup = group.items.filter((s) => s.status === 'DONE').length;
           const complete = doneInGroup === group.items.length;
           const percent = Math.round((doneInGroup / group.items.length) * 100);
+          const isNow = order(group.key) === nowPhase;
+          // Open what matters now: started phases with open steps (incl. overdue), "Anytime" once the rest is done.
+          const open = !complete && (group.key === 'anytime' ? !timedLeft : order(group.key) <= nowPhase);
           return (
-            <li key={group.module}>
-              <details open={!complete} className="group rounded-2xl border border-slate-200/80 bg-white shadow-card">
+            <li key={group.key}>
+              <details
+                open={open}
+                className={`group rounded-2xl border bg-white shadow-card ${isNow ? 'border-brand-300 ring-1 ring-brand-200' : 'border-slate-200/80'}`}
+              >
                 <summary className="flex cursor-pointer list-none items-center gap-4 p-4 sm:p-5">
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
-                      complete ? 'bg-brand-500 text-white' : 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
+                      complete ? 'bg-brand-500 text-white' : isNow ? 'bg-accent-500 text-white' : 'bg-brand-50 text-brand-700 ring-1 ring-brand-200'
                     }`}
                   >
-                    {complete ? <CheckCircle2 size={18} /> : index + 1}
+                    {complete ? <CheckCircle2 size={18} /> : <CalendarDays size={16} />}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-slate-900">{group.module}</h3>
+                    <h3 className="flex flex-wrap items-center gap-x-2 font-semibold text-slate-900">
+                      {group.label}
+                      {group.dates && <span className="text-sm font-normal text-slate-500">· {group.dates}</span>}
+                      {isNow && <Badge tone="accent">Now</Badge>}
+                    </h3>
                     <div className="mt-1.5 flex items-center gap-3">
                       <div className="max-w-xs flex-1">
                         <ProgressBar percent={percent} showLabel={false} />
@@ -172,6 +197,7 @@ export function PlanView({
                         contact={resolveContact(step, contactPlan, people)}
                         highlight={step.id === next?.id}
                         readOnly={readOnly}
+                        showModule
                       />
                     </li>
                   ))}

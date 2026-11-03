@@ -72,8 +72,16 @@ export function StepFields({
           <textarea name="doneWhen" rows={2} maxLength={500} defaultValue={defaults.doneWhen} className={inputClass} />
         </Field>
       </div>
-      <Field label="Week" hint="Week of onboarding, 1 = the first week. Leave empty for no timing.">
-        <input name="week" type="number" min={1} max={52} defaultValue={defaults.week ?? ''} className={inputClass} />
+      <Field label="When" hint="Decides where the step shows for the new hire: Day 1, Week 1, Week 2, Weeks 3–4, Month 2, …">
+        <select name="week" defaultValue={defaults.week ?? ''} className={inputClass}>
+          <option value="">Anytime (no timing)</option>
+          <option value="0">Day 1</option>
+          {Array.from({ length: 52 }, (_, i) => i + 1).map((week) => (
+            <option key={week} value={week}>
+              Week {week}
+            </option>
+          ))}
+        </select>
       </Field>
       {withDate && (
         <Field label="Or on date" hint="A fixed date wins over the week">

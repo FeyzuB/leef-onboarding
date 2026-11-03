@@ -103,7 +103,7 @@ function stepFields(form: FormData) {
     links: parseLinks(text(form, 'links', 4000)),
     ...contactFields(form),
     doneWhen: text(form, 'doneWhen', 500),
-    week: optionalInt(form, 'week', 1, 52),
+    week: optionalInt(form, 'week', 0, 52),
     dueDate: optionalDate(form, 'dueDate', 'Choose a valid date'),
   };
 }

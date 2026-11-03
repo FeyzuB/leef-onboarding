@@ -83,6 +83,7 @@ export function StepRow({
   contact,
   highlight = false,
   readOnly = false,
+  showModule = false,
 }: {
   step: PlanStep;
   startDate: Date;
@@ -90,6 +91,8 @@ export function StepRow({
   highlight?: boolean;
   /** For previews: no tick, no "I'm stuck". */
   readOnly?: boolean;
+  /** Show the step's subject (module) as a small label, for views grouped by time. */
+  showModule?: boolean;
 }) {
   const done = step.status === 'DONE';
   const blocked = step.status === 'BLOCKED';
@@ -115,6 +118,7 @@ export function StepRow({
                   <Flag size={12} /> Next up
                 </span>
               )}
+              {showModule && <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">{step.module}</span>}
               {timing && <span className={overdue ? 'font-medium text-amber-700' : ''}>{timing}</span>}
               {contact && (
                 <span className="inline-flex items-center gap-1">
