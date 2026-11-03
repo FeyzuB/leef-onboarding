@@ -46,78 +46,123 @@ function EntryFields({ entry, entries, teams }: { entry?: Entry; entries: Entry[
   );
 }
 
-function Branch({
-  entry,
-  childrenOf,
-  canEdit,
-  entries,
-  teams,
-  depth,
-}: {
-  entry: Entry;
-  childrenOf: Map<string | null, Entry[]>;
-  canEdit: boolean;
-  entries: Entry[];
-  teams: Team[];
-  depth: number;
-}) {
-  const reports = childrenOf.get(entry.id) ?? [];
-  // Rendered inside an <li key={entry.id}> by the caller: keys on server components are not kept,
-  // so the key must sit on a plain element or React matches cards by position and mixes up their forms.
+type TreeProps = { childrenOf: Map<string | null, Entry[]>; canEdit: boolean; entries: Entry[]; teams: Team[] };
+
+/** Edit and remove, shown on hover for leads. */
+function EntryActions({ entry, reports, entries, teams }: { entry: Entry; reports: number; entries: Entry[]; teams: Team[] }) {
   return (
-    <>
-      <div
-        id={`person-${entry.id}`}
-        className="group flex scroll-mt-24 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 pr-2 shadow-card transition target:border-brand-500 target:ring-2 target:ring-brand-500/30 sm:max-w-md"
+    <div className="flex shrink-0 items-center rounded-lg bg-white/90 opacity-100 transition sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+      {/* Rebuilt whenever the saved values change, so it never shows or re-saves stale values. */}
+      <Drawer
+        key={[entry.name, entry.jobTitle, entry.teamId, entry.reportsToId].join('|')}
+        title={`Edit ${entry.name}`}
+        triggerClassName={iconButtonClass}
+        triggerLabel="Edit"
+        trigger={<Pencil size={14} />}
       >
-        <Avatar name={entry.name} size="lg" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-slate-900">{entry.name}</p>
-          {entry.jobTitle && <p className="truncate text-sm text-slate-600">{entry.jobTitle}</p>}
-          {entry.team && (
-            <p className="mt-1">
-              <Badge tone="brand">{entry.team.name}</Badge>
-            </p>
-          )}
+        <form action={updateOrgEntry} className="space-y-4">
+          <input type="hidden" name="entryId" value={entry.id} />
+          <EntryFields entry={entry} entries={entries} teams={teams} />
+          <SubmitButton>Save</SubmitButton>
+        </form>
+      </Drawer>
+      <form action={deleteOrgEntry}>
+        <input type="hidden" name="entryId" value={entry.id} />
+        <ConfirmButton
+          message={`Remove ${entry.name}?${reports ? ' Their direct reports move up to their manager.' : ''}`}
+          className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+        >
+          <Trash2 size={14} aria-label="Remove" />
+        </ConfirmButton>
+      </form>
+    </div>
+  );
+}
+
+/** A person as a card in the chart: avatar on top, name, job title and team. */
+function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; tree: TreeProps }) {
+  return (
+    <div
+      id={`person-${entry.id}`}
+      className="group relative mx-auto flex w-52 scroll-mt-24 flex-col items-center rounded-2xl border border-slate-200/80 bg-white px-3 pb-3 pt-4 text-center shadow-card transition target:border-brand-500 target:ring-2 target:ring-brand-500/30"
+    >
+      {tree.canEdit && (
+        <div className="absolute right-1 top-1">
+          <EntryActions entry={entry} reports={reports} entries={tree.entries} teams={tree.teams} />
         </div>
-        {canEdit && (
-          <div className="flex shrink-0 items-center opacity-100 transition sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-            {/* Rebuilt whenever the saved values change, so it never shows or re-saves stale values. */}
-            <Drawer
-              key={[entry.name, entry.jobTitle, entry.teamId, entry.reportsToId].join('|')}
-              title={`Edit ${entry.name}`}
-              triggerClassName={iconButtonClass}
-              triggerLabel="Edit"
-              trigger={<Pencil size={15} />}
-            >
-              <form action={updateOrgEntry} className="space-y-4">
-                <input type="hidden" name="entryId" value={entry.id} />
-                <EntryFields entry={entry} entries={entries} teams={teams} />
-                <SubmitButton>Save</SubmitButton>
-              </form>
-            </Drawer>
-            <form action={deleteOrgEntry}>
-              <input type="hidden" name="entryId" value={entry.id} />
-              <ConfirmButton
-                message={`Remove ${entry.name}?${reports.length ? ' Their direct reports move up to their manager.' : ''}`}
-                className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-              >
-                <Trash2 size={15} aria-label="Remove" />
-              </ConfirmButton>
-            </form>
-          </div>
-        )}
-      </div>
-      {reports.length > 0 && depth < 20 && (
-        <ul className="ml-6 mt-3 space-y-3 border-l-2 border-brand-100 pl-5 sm:ml-7 sm:pl-7">
-          {reports.map((child) => (
-            <li key={child.id}>
-              <Branch entry={child} childrenOf={childrenOf} canEdit={canEdit} entries={entries} teams={teams} depth={depth + 1} />
-            </li>
-          ))}
-        </ul>
       )}
-    </>
+      <Avatar name={entry.name} size="lg" />
+      <p className="mt-2 w-full truncate font-semibold text-slate-900">{entry.name}</p>
+      {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-600">{entry.jobTitle}</p>}
+      {entry.team && (
+        <p className="mt-1.5">
+          <Badge tone="brand">{entry.team.name}</Badge>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** A person without reports, as a compact row in a manager's team box. */
+function PersonRow({ entry, tree }: { entry: Entry; tree: TreeProps }) {
+  return (
+    <div
+      id={`person-${entry.id}`}
+      className="group relative flex scroll-mt-24 items-center gap-2.5 rounded-xl bg-white px-2.5 py-2 ring-1 ring-slate-200/80 transition target:ring-2 target:ring-brand-500"
+    >
+      <Avatar name={entry.name} size="sm" />
+      <div className="min-w-0 flex-1 text-left">
+        <p className="truncate text-sm font-semibold text-slate-900">{entry.name}</p>
+        {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-500">{entry.jobTitle}</p>}
+      </div>
+      {tree.canEdit && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2">
+          <EntryActions entry={entry} reports={0} entries={tree.entries} teams={tree.teams} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const line = 'bg-brand-200';
+
+/**
+ * One person and everyone below them, top-down. Managers whose reports have no reports of their own
+ * get those reports as a stacked list, so wide teams stay readable instead of one long row.
+ * Rendered inside an <li key={entry.id}>: keys on server components are not kept.
+ */
+function Node({ entry, tree, depth }: { entry: Entry; tree: TreeProps; depth: number }) {
+  const reports = tree.childrenOf.get(entry.id) ?? [];
+  const leavesOnly = reports.every((r) => !(tree.childrenOf.get(r.id) ?? []).length);
+  return (
+    <div className="flex flex-col items-center">
+      <PersonCard entry={entry} reports={reports.length} tree={tree} />
+      {reports.length > 0 && depth < 20 && (
+        <>
+          <div className={`h-5 w-px ${line}`} />
+          {leavesOnly ? (
+            <ul className="w-60 space-y-1.5 rounded-2xl bg-brand-50/60 p-2 ring-1 ring-brand-100">
+              {reports.map((child) => (
+                <li key={child.id}>
+                  <PersonRow entry={child} tree={tree} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="flex justify-center">
+              {reports.map((child) => (
+                <li
+                  key={child.id}
+                  className={`relative px-2 pt-5 before:absolute before:left-0 before:right-0 before:top-0 before:h-px before:bg-brand-200 after:absolute after:left-1/2 after:top-0 after:h-5 after:w-px after:bg-brand-200 first:before:left-1/2 last:before:right-1/2 only:before:hidden`}
+                >
+                  <Node entry={child} tree={tree} depth={depth + 1} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -136,6 +181,12 @@ export default async function OrganogramPage() {
     childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), entry]);
   }
   const roots = childrenOf.get(null) ?? [];
+  // People at the top with reports form the chart; people at the top on their own (e.g. HR and finance
+  // from the parent company) are listed separately. With only loose people, they form the chart.
+  const withReports = roots.filter((r) => (childrenOf.get(r.id) ?? []).length > 0);
+  const trees = withReports.length ? withReports : roots;
+  const loose = withReports.length ? roots.filter((r) => !withReports.includes(r)) : [];
+  const tree: TreeProps = { childrenOf, canEdit, entries, teams };
 
   return (
     <>
@@ -165,15 +216,31 @@ export default async function OrganogramPage() {
       {entries.length === 0 ? (
         <EmptyState>{canEdit ? 'Nobody added yet. Start with the person at the top.' : 'The organogram is still empty.'}</EmptyState>
       ) : (
-        <ul className="space-y-3">
-          {roots.map((entry) => (
-            <li key={entry.id}>
-              <Branch entry={entry} childrenOf={childrenOf} canEdit={canEdit} entries={entries} teams={teams} depth={0} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="-mx-4 overflow-x-auto px-4 pb-4">
+            <ul className="flex min-w-max justify-center gap-10 py-2">
+              {trees.map((entry) => (
+                <li key={entry.id}>
+                  <Node entry={entry} tree={tree} depth={0} />
+                </li>
+              ))}
+            </ul>
+          </div>
+          {loose.length > 0 && (
+            <section className="mt-10">
+              <h2 className="mb-1 text-lg font-bold text-slate-900">Also good to know</h2>
+              <p className="mb-4 text-sm text-slate-600">People outside the reporting line who you may work with.</p>
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {loose.map((entry) => (
+                  <li key={entry.id}>
+                    <PersonCard entry={entry} reports={0} tree={tree} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
       )}
-
     </>
   );
 }
