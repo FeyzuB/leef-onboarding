@@ -9,3 +9,4 @@ dist
 coverage
 *.tsbuildinfo
 npm-debug.log*
+.neon
