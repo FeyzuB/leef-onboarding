@@ -84,7 +84,7 @@ function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; t
   return (
     <div
       id={`person-${entry.id}`}
-      className="group relative mx-auto flex w-52 scroll-mt-24 flex-col items-center rounded-2xl border border-slate-200/80 bg-white px-3 pb-3 pt-4 text-center shadow-card transition target:border-brand-500 target:ring-2 target:ring-brand-500/30"
+      className="group relative mx-auto flex w-full max-w-[13rem] scroll-mt-24 flex-col items-center rounded-2xl border border-slate-200/80 bg-white px-3 pb-3 pt-4 text-center shadow-card transition target:border-brand-500 target:ring-2 target:ring-brand-500/30"
     >
       {tree.canEdit && (
         <div className="absolute right-1 top-1">
@@ -92,7 +92,7 @@ function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; t
         </div>
       )}
       <Avatar name={entry.name} size="lg" />
-      <p className="mt-2 w-full truncate font-semibold text-slate-900">{entry.name}</p>
+      <p className="mt-2 line-clamp-2 w-full break-words font-semibold text-slate-900">{entry.name}</p>
       {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-600">{entry.jobTitle}</p>}
       {entry.team && (
         <p className="mt-1.5">
@@ -112,7 +112,7 @@ function PersonRow({ entry, tree }: { entry: Entry; tree: TreeProps }) {
     >
       <Avatar name={entry.name} size="sm" />
       <div className="min-w-0 flex-1 text-left">
-        <p className="truncate text-sm font-semibold text-slate-900">{entry.name}</p>
+        <p className="line-clamp-2 break-words text-sm font-semibold text-slate-900">{entry.name}</p>
         {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-500">{entry.jobTitle}</p>}
       </div>
       {tree.canEdit && (
@@ -135,13 +135,13 @@ function Node({ entry, tree, depth }: { entry: Entry; tree: TreeProps; depth: nu
   const reports = tree.childrenOf.get(entry.id) ?? [];
   const leavesOnly = reports.every((r) => !(tree.childrenOf.get(r.id) ?? []).length);
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex w-full flex-col items-center">
       <PersonCard entry={entry} reports={reports.length} tree={tree} />
       {reports.length > 0 && depth < 20 && (
         <>
           <div className={`h-5 w-px ${line}`} />
           {leavesOnly ? (
-            <ul className="w-60 space-y-1.5 rounded-2xl bg-brand-50/60 p-2 ring-1 ring-brand-100">
+            <ul className="w-full max-w-[15rem] space-y-1.5 rounded-2xl bg-brand-50/60 p-2 ring-1 ring-brand-100">
               {reports.map((child) => (
                 <li key={child.id}>
                   <PersonRow entry={child} tree={tree} />
@@ -149,11 +149,11 @@ function Node({ entry, tree, depth }: { entry: Entry; tree: TreeProps; depth: nu
               ))}
             </ul>
           ) : (
-            <ul className="flex justify-center">
+            <ul className="flex w-full justify-center">
               {reports.map((child) => (
                 <li
                   key={child.id}
-                  className={`relative px-2 pt-5 before:absolute before:left-0 before:right-0 before:top-0 before:h-px before:bg-brand-200 after:absolute after:left-1/2 after:top-0 after:h-5 after:w-px after:bg-brand-200 first:before:left-1/2 last:before:right-1/2 only:before:hidden`}
+                  className={`relative min-w-0 max-w-[16rem] flex-1 basis-0 px-1.5 pt-5 before:absolute before:left-0 before:right-0 before:top-0 before:h-px before:bg-brand-200 after:absolute after:left-1/2 after:top-0 after:h-5 after:w-px after:bg-brand-200 first:before:left-1/2 last:before:right-1/2 only:before:hidden`}
                 >
                   <Node entry={child} tree={tree} depth={depth + 1} />
                 </li>
@@ -217,10 +217,10 @@ export default async function OrganogramPage() {
         <EmptyState>{canEdit ? 'Nobody added yet. Start with the person at the top.' : 'The organogram is still empty.'}</EmptyState>
       ) : (
         <>
-          <div className="-mx-4 overflow-x-auto px-4 pb-4">
-            <ul className="flex min-w-max justify-center gap-10 py-2">
+          <div className="no-scrollbar -mx-4 overflow-x-auto px-4 pb-4">
+            <ul className="flex min-w-[38rem] justify-center gap-10 py-2">
               {trees.map((entry) => (
-                <li key={entry.id}>
+                <li key={entry.id} className="min-w-0 flex-1">
                   <Node entry={entry} tree={tree} depth={0} />
                 </li>
               ))}

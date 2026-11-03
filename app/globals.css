@@ -46,3 +46,11 @@ details[open] > summary .details-chevron {
 .rich-text hr {
   @apply border-slate-200;
 }
+
+/* Sideways scrolling without a visible scrollbar (the org chart on small screens). */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
