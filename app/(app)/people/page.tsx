@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { AppRole } from '@prisma/client';
-import { createUser, deleteUser, resetPassword, setUserActive } from '@/app/actions/people';
-import { KeyRound, Trash2, UserPlus } from 'lucide-react';
+import { createUser, deleteUser, resetPassword, setUserActive, updateUser } from '@/app/actions/people';
+import { KeyRound, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { Drawer } from '@/components/Drawer';
 import { iconButtonClass } from '@/components/MoveButtons';
 import { ConfirmButton, StatefulForm, SubmitButton } from '@/components/forms';
@@ -112,6 +112,52 @@ export default async function PeoplePage() {
                         Create plan
                       </Link>
                     ))}
+                  {manageable && (
+                    <Drawer
+                      key={[user.name, user.appRole, user.teamId].join('|')}
+                      title={`Edit ${user.name}`}
+                      triggerClassName={iconButtonClass}
+                      triggerLabel="Edit person"
+                      trigger={<Pencil size={15} />}
+                    >
+                      <StatefulForm action={updateUser} className="space-y-4">
+                        <input type="hidden" name="userId" value={user.id} />
+                        <Field label="Full name">
+                          <input name="name" required maxLength={100} defaultValue={user.name} className={inputClass} />
+                        </Field>
+                        {admin ? (
+                          <>
+                            <Field
+                              label="Role"
+                              hint={user.plan ? 'Has an onboarding plan, so stays a new hire until the plan is deleted.' : undefined}
+                            >
+                              <select name="appRole" defaultValue={user.appRole} className={inputClass}>
+                                <option value="NEW_HIRE">New hire</option>
+                                <option value="LEAD">Lead</option>
+                                <option value="ADMIN">Admin</option>
+                              </select>
+                            </Field>
+                            <Field label="Team">
+                              <select name="teamId" defaultValue={user.teamId ?? ''} className={inputClass}>
+                                <option value="">No team (admins only)</option>
+                                {teams.map((team) => (
+                                  <option key={team.id} value={team.id}>
+                                    {team.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+                          </>
+                        ) : (
+                          <p className="text-sm text-slate-500">
+                            Username <span className="font-medium text-slate-700">{user.username}</span> · {ROLE_LABELS[user.appRole]}
+                            {user.team && ` · ${user.team.name}`}. Ask an admin to change the role or team.
+                          </p>
+                        )}
+                        <SubmitButton>Save</SubmitButton>
+                      </StatefulForm>
+                    </Drawer>
+                  )}
                   {manageable && user.active && (
                     <Drawer
                       title={`Reset password for ${user.name}`}
