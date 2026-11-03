@@ -237,11 +237,10 @@ function units(entry: Entry, tree: TreeProps): number {
     entry,
     reports.filter((r) => !hasReports(r, tree)),
   ).length;
-  if (!managers.length) return Math.max(1, groups);
-  return managers.reduce((n, m) => n + units(m, tree), 0) + (groups ? 1 : 0);
+  return Math.max(1, groups + managers.reduce((n, m) => n + units(m, tree), 0));
 }
 
-const UNIT_MIN = 13; // rem
+const UNIT_MIN = 12; // rem
 const UNIT_MAX = 21; // rem
 
 function columnStyle(n: number) {
@@ -262,7 +261,7 @@ function Column({ n, children }: { n: number; children: ReactNode }) {
 
 /**
  * One person and everyone below them, top-down. Reports who lead others get their own branch;
- * the rest sit in boxes per team the person manages (side by side when there is nothing else below).
+ * the rest sit in boxes per team the person manages. Each box and branch gets its own column on the line.
  * Rendered inside an <li key={entry.id}>: keys on server components are not kept.
  */
 function Node({ entry, tree, depth, anchored }: { entry: Entry; tree: TreeProps; depth: number; anchored: Set<string> }) {
@@ -279,30 +278,17 @@ function Node({ entry, tree, depth, anchored }: { entry: Entry; tree: TreeProps;
         <>
           <div className="h-7 w-px bg-brand-200" />
           <ul className="flex w-full justify-center">
-            {managers.length === 0 ? (
-              groups.map((group) => (
-                <Column key={group.key} n={1}>
-                  <TeamBox group={group} anchored={anchored} tree={tree} />
-                </Column>
-              ))
-            ) : (
-              <>
-                {groups.length > 0 && (
-                  <Column n={1}>
-                    <div className="space-y-4">
-                      {groups.map((group) => (
-                        <TeamBox key={group.key} group={group} anchored={anchored} tree={tree} />
-                      ))}
-                    </div>
-                  </Column>
-                )}
-                {managers.map((child) => (
-                  <Column key={child.id} n={units(child, tree)}>
-                    <Node entry={child} tree={tree} depth={depth + 1} anchored={anchored} />
-                  </Column>
-                ))}
-              </>
-            )}
+            {/* Every team box and every branch hangs from this person's line in its own column. */}
+            {groups.map((group) => (
+              <Column key={group.key} n={1}>
+                <TeamBox group={group} anchored={anchored} tree={tree} />
+              </Column>
+            ))}
+            {managers.map((child) => (
+              <Column key={child.id} n={units(child, tree)}>
+                <Node entry={child} tree={tree} depth={depth + 1} anchored={anchored} />
+              </Column>
+            ))}
           </ul>
         </>
       )}
