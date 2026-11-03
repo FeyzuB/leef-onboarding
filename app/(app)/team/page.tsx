@@ -30,6 +30,7 @@ import { MoveButtons, iconButtonClass } from '@/components/MoveButtons';
 import { AddForm, ConfirmButton, SubmitButton } from '@/components/forms';
 import { EmptyState, Field, PageHeader, buttonClass, inputClass } from '@/components/ui';
 import { inScope, isAdmin, isLead, requireUser } from '@/lib/auth';
+import { isSafeUrl } from '@/lib/logic';
 import { prisma } from '@/lib/prisma';
 
 // An icon per entry, guessed from words in its title (Dutch or English); a map pin when nothing matches.
@@ -122,12 +123,15 @@ export default async function TeamPage() {
                   {team.resources.map((resource) => {
                     const Icon = iconFor(resource.title);
                     return (
-                      <li key={resource.id} className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition hover:shadow-lift">
+                      <li
+                        key={resource.id}
+                        className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition hover:shadow-lift"
+                      >
                         <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
                           <Icon size={20} />
                         </span>
                         <h3 className="font-semibold text-slate-900">{resource.title}</h3>
-                        {resource.url ? (
+                        {resource.url && isSafeUrl(resource.url) ? (
                           <a
                             href={resource.url}
                             target="_blank"
@@ -158,7 +162,10 @@ export default async function TeamPage() {
                             </Drawer>
                             <form action={deleteResource}>
                               <input type="hidden" name="resourceId" value={resource.id} />
-                              <ConfirmButton message={`Delete “${resource.title}”?`} className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600">
+                              <ConfirmButton
+                                message={`Delete “${resource.title}”?`}
+                                className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                              >
                                 <Trash2 size={15} aria-label="Delete entry" />
                               </ConfirmButton>
                             </form>

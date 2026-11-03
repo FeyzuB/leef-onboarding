@@ -24,8 +24,7 @@ async function editablePlan(form: FormData) {
 async function validLeadId(actor: User, leadId: string) {
   if (!leadId) return null;
   const lead = await prisma.user.findUnique({ where: { id: leadId } });
-  const ok =
-    !!lead && lead.active && isLead(lead) && (lead.appRole === 'ADMIN' || inScope(actor, lead.teamId));
+  const ok = !!lead && lead.active && isLead(lead) && (lead.appRole === 'ADMIN' || inScope(actor, lead.teamId));
   if (!ok) throw new Error('Choose a valid lead');
   return lead.id;
 }
@@ -47,7 +46,7 @@ function startDate(form: FormData) {
 export async function createPlan(form: FormData) {
   const actor = await requireLead();
   const newHire = await prisma.user.findUnique({ where: { id: text(form, 'newHireId') }, include: { plan: true } });
-  if (!newHire || !inScope(actor, newHire.teamId)) throw new Error('New hire not found');
+  if (!newHire || newHire.appRole !== 'NEW_HIRE' || !newHire.active || !inScope(actor, newHire.teamId)) throw new Error('New hire not found');
   if (newHire.plan) redirect(`/plans/${newHire.plan.id}`);
   const template = await prisma.template.findUnique({ where: { id: text(form, 'templateId') } });
   if (!template || !inScope(actor, template.teamId)) throw new Error('Template not found');

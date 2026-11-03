@@ -3,14 +3,9 @@
 import bcrypt from 'bcryptjs';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { endSession, requireUser, startSession } from '@/lib/auth';
+import { endSession, getCurrentUser, requireUser, startSession } from '@/lib/auth';
+import { clearFailures, clientAddress, isBraked, recordFailure } from '@/lib/loginBrake';
 import { type FormState, normaliseUsername, text, validateNewPassword } from '@/lib/forms';
-
-// Simple in-memory brake on password guessing: 5 failures locks a username for 15 minutes.
-// Resets on restart, which is acceptable for a single internal instance.
-const MAX_FAILURES = 5;
-const LOCK_MS = 15 * 60 * 1000;
-const failures = new Map<string, { count: number; firstAt: number }>();
 
 let dummyHash: string | undefined;
 async function hashForMissingUser() {
@@ -29,26 +24,27 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const password = rawPassword(form, 'password');
   if (!username || !password) return { error: 'Enter your username and password' };
 
-  const record = failures.get(username);
-  if (record && Date.now() - record.firstAt > LOCK_MS) failures.delete(username);
-  if ((failures.get(username)?.count ?? 0) >= MAX_FAILURES) {
+  const address = clientAddress();
+  if (await isBraked(username, address)) {
     return { error: 'Too many failed attempts. Try again in 15 minutes or ask your lead to reset your password.' };
   }
 
   const user = await prisma.user.findUnique({ where: { username } });
   const valid = await bcrypt.compare(password, user?.passwordHash ?? (await hashForMissingUser()));
   if (!user || !valid || !user.active) {
-    const current = failures.get(username);
-    failures.set(username, { count: (current?.count ?? 0) + 1, firstAt: current?.firstAt ?? Date.now() });
+    await recordFailure(username, address);
     return { error: 'Wrong username or password' };
   }
 
-  failures.delete(username);
+  await clearFailures(username, address);
   await startSession(user);
   redirect(user.mustChangePassword ? '/change-password' : '/');
 }
 
 export async function logout() {
+  // Bump the session version so a copied session cookie stops working too.
+  const user = await getCurrentUser();
+  if (user) await prisma.user.update({ where: { id: user.id }, data: { sessionVersion: { increment: 1 } } });
   endSession();
   redirect('/login');
 }

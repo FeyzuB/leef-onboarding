@@ -202,3 +202,13 @@ model OrgEntry {
   buddyOf     Plan[]     @relation("PlanBuddy")
   createdAt   DateTime   @default(now())
 }
+
+// One row per failed login, so the brake on password guessing works across serverless instances.
+// `key` is "user:<username>", "ip:<address>" or "user-ip:<username>|<address>".
+model LoginFailure {
+  id        String   @id @default(uuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}

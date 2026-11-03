@@ -14,16 +14,12 @@ function secretKey() {
 }
 
 export async function signSession(payload: SessionPayload): Promise<string> {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_HOURS}h`)
-    .sign(secretKey());
+  return new SignJWT(payload).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime(`${SESSION_HOURS}h`).sign(secretKey());
 }
 
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, secretKey());
+    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ['HS256'], requiredClaims: ['exp', 'iat'] });
     if (typeof payload.userId !== 'string' || typeof payload.version !== 'number') return null;
     return { userId: payload.userId, version: payload.version };
   } catch {
@@ -34,7 +30,8 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
 export const sessionCookieOptions = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.COOKIE_SECURE === 'true',
+  // Secure by default in production; COOKIE_SECURE=false allows plain http (e.g. the local Docker stack).
+  secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : process.env.NODE_ENV === 'production',
   path: '/',
   maxAge: SESSION_HOURS * 60 * 60,
 };
