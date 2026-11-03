@@ -3,12 +3,25 @@ import type { PlanStep } from '@prisma/client';
 import { Check, ChevronRight, CircleAlert, Flag, Link2, UserRound } from 'lucide-react';
 import { setStepStatus } from '@/app/actions/progress';
 import { SubmitButton } from '@/components/forms';
+import { RichText } from '@/components/RichText';
 import { StepLinks } from '@/components/StepFields';
 import { Badge, inputClass, secondaryButtonClass, smallButtonClass } from '@/components/ui';
 import { APP_TIMEZONE } from '@/lib/config';
 import { formatDate, isOverdue, stepDueDate, stepTimingLabel, toLinks, type ResolvedContact } from '@/lib/logic';
 
-function StatusForm({ stepId, status, children, className, label }: { stepId: string; status: string; children: ReactNode; className: string; label: string }) {
+function StatusForm({
+  stepId,
+  status,
+  children,
+  className,
+  label,
+}: {
+  stepId: string;
+  status: string;
+  children: ReactNode;
+  className: string;
+  label: string;
+}) {
   return (
     <form action={setStepStatus}>
       <input type="hidden" name="stepId" value={stepId} />
@@ -38,7 +51,12 @@ export function ContactName({ contact }: { contact: ResolvedContact }) {
 export function StepCheck({ step }: { step: PlanStep }) {
   const done = step.status === 'DONE';
   return done ? (
-    <StatusForm stepId={step.id} status="OPEN" label="Mark as not done" className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white shadow-sm transition hover:bg-brand-600">
+    <StatusForm
+      stepId={step.id}
+      status="OPEN"
+      label="Mark as not done"
+      className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white shadow-sm transition hover:bg-brand-600"
+    >
       <Check size={14} strokeWidth={3} />
     </StatusForm>
   ) : (
@@ -114,7 +132,7 @@ export function StepRow({
         </summary>
 
         <div className="mt-3 space-y-3 border-l-2 border-brand-100 pl-4 text-sm">
-          {step.explanation && <p className="whitespace-pre-line text-slate-700">{step.explanation}</p>}
+          <RichText value={step.explanation} className="text-slate-700" />
           <StepLinks links={links} />
           {(contact || step.doneWhen) && (
             <dl className="grid gap-1 text-xs text-slate-600 sm:grid-cols-2">

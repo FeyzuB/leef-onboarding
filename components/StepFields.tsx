@@ -1,3 +1,4 @@
+import { RichTextEditor } from '@/components/RichTextEditor';
 import { Field, inputClass } from '@/components/ui';
 import { formatLinks, toDateInput, type Link } from '@/lib/logic';
 
@@ -39,8 +40,8 @@ export function StepFields({
         <input name="title" required maxLength={200} defaultValue={defaults.title} className={inputClass} />
       </Field>
       <div className="sm:col-span-2">
-        <Field label="Explanation">
-          <textarea name="explanation" rows={3} maxLength={4000} defaultValue={defaults.explanation} className={inputClass} />
+        <Field label="Explanation" hint="Paste from Word or Outlook keeps bold, links, lists and colours. Use the box for e.g. a signature template.">
+          <RichTextEditor name="explanation" defaultValue={defaults.explanation} />
         </Field>
       </div>
       <div className="sm:col-span-2">
@@ -54,19 +55,23 @@ export function StepFields({
           />
         </Field>
       </div>
-      <Field label="Contact" hint="The manager or buddy shows as the name set on each plan">
-        <div className="flex gap-2">
-          <select name="contactRole" defaultValue={defaults.contactRole ?? ''} className={`${inputClass} w-auto`}>
-            <option value="">Name:</option>
-            <option value="MANAGER">The manager</option>
-            <option value="BUDDY">The buddy</option>
-          </select>
-          <input name="contact" maxLength={200} defaultValue={defaults.contact} placeholder="e.g. Eva Eigenberg (HR)" className={inputClass} />
-        </div>
-      </Field>
-      <Field label="Done when">
-        <input name="doneWhen" maxLength={500} defaultValue={defaults.doneWhen} className={inputClass} />
-      </Field>
+      <div className="sm:col-span-2">
+        <Field label="Contact" hint="The manager or buddy shows as the name set on each plan">
+          <div className="flex gap-2">
+            <select name="contactRole" defaultValue={defaults.contactRole ?? ''} className={`${inputClass} w-auto`}>
+              <option value="">Name:</option>
+              <option value="MANAGER">The manager</option>
+              <option value="BUDDY">The buddy</option>
+            </select>
+            <input name="contact" maxLength={200} defaultValue={defaults.contact} placeholder="e.g. Eva Eigenberg (HR)" className={inputClass} />
+          </div>
+        </Field>
+      </div>
+      <div className="sm:col-span-2">
+        <Field label="Done when">
+          <textarea name="doneWhen" rows={2} maxLength={500} defaultValue={defaults.doneWhen} className={inputClass} />
+        </Field>
+      </div>
       <Field label="Week" hint="Week of onboarding, 1 = the first week. Leave empty for no timing.">
         <input name="week" type="number" min={1} max={52} defaultValue={defaults.week ?? ''} className={inputClass} />
       </Field>

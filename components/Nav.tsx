@@ -65,11 +65,17 @@ export function Nav({ user, hasPlan }: { user: User; hasPlan: boolean }) {
             </div>
           </div>
           <div className="mt-3 flex gap-1">
-            <Link href="/change-password" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+            <Link
+              href="/change-password"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+            >
               <KeyRound size={14} /> Password
             </Link>
             <form action={logout} className="flex-1">
-              <button type="submit" className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100">
+              <button
+                type="submit"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
                 <LogOut size={14} /> Log out
               </button>
             </form>

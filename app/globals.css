@@ -13,3 +13,36 @@ summary::-webkit-details-marker {
 details[open] > summary .details-chevron {
   transform: rotate(90deg);
 }
+
+/* Rich-text step explanations (shown on a step and inside the editor). */
+.rich-text > * + * {
+  margin-top: 0.5em;
+}
+.rich-text ul {
+  @apply list-disc pl-5;
+}
+.rich-text ol {
+  @apply list-decimal pl-5;
+}
+.rich-text li > p {
+  margin: 0;
+}
+.rich-text a {
+  @apply text-brand-700 underline hover:text-brand-800;
+}
+.rich-text h3 {
+  @apply text-base font-semibold text-slate-900;
+}
+.rich-text h4 {
+  @apply font-semibold text-slate-900;
+}
+/* The "box": a bordered block, e.g. an e-mail signature template. */
+.rich-text blockquote {
+  @apply rounded-lg border border-slate-300 bg-white px-3 py-2;
+}
+.rich-text blockquote > p + p {
+  margin-top: 0;
+}
+.rich-text hr {
+  @apply border-slate-200;
+}

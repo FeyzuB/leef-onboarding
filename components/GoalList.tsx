@@ -71,7 +71,10 @@ export function GoalList({
                 <form action={deleteGoal}>
                   <input type="hidden" name="planId" value={planId} />
                   <input type="hidden" name="goalId" value={goal.id} />
-                  <ConfirmButton message="Remove this goal from the plan?" className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600">
+                  <ConfirmButton
+                    message="Remove this goal from the plan?"
+                    className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                  >
                     <Trash2 size={15} aria-label="Remove goal" />
                   </ConfirmButton>
                 </form>

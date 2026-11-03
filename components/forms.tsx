@@ -30,15 +30,7 @@ export function ConfirmButton({ children, message, className }: { children: Reac
 }
 
 /** A form for adding things: clears its fields after a successful save so the same entry isn't added twice. */
-export function AddForm({
-  action,
-  children,
-  className,
-}: {
-  action: (form: FormData) => Promise<void>;
-  children: ReactNode;
-  className?: string;
-}) {
+export function AddForm({ action, children, className }: { action: (form: FormData) => Promise<void>; children: ReactNode; className?: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   return (
     <form

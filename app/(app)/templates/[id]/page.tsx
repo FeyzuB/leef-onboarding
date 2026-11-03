@@ -18,8 +18,20 @@ import {
 import { Drawer } from '@/components/Drawer';
 import { MoveButtons, iconButtonClass } from '@/components/MoveButtons';
 import { StepFields } from '@/components/StepFields';
+import { toPlainText } from '@/lib/richText';
 import { AddForm, ConfirmButton, SubmitButton } from '@/components/forms';
-import { Badge, Card, CardTitle, EmptyState, Field, buttonClass, dangerButtonClass, inputClass, secondaryButtonClass, smallButtonClass } from '@/components/ui';
+import {
+  Badge,
+  Card,
+  CardTitle,
+  EmptyState,
+  Field,
+  buttonClass,
+  dangerButtonClass,
+  inputClass,
+  secondaryButtonClass,
+  smallButtonClass,
+} from '@/components/ui';
 import { inScope, requireLead } from '@/lib/auth';
 import { groupByModule, stepVersion, templateContact, toLinks } from '@/lib/logic';
 import { prisma } from '@/lib/prisma';
@@ -38,9 +50,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
   const groups = groupByModule(template.steps);
   const modules = groups.map((g) => g.module);
   const behind = template.plans.filter((p) => p.templateVersion < template.version).length;
-  const goals = [...template.goals].sort(
-    (a, b) => (a.withinWeeks ?? Infinity) - (b.withinWeeks ?? Infinity) || a.position - b.position,
-  );
+  const goals = [...template.goals].sort((a, b) => (a.withinWeeks ?? Infinity) - (b.withinWeeks ?? Infinity) || a.position - b.position);
 
   return (
     <>
@@ -55,7 +65,8 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
             <Badge tone="brand">{template.team.name}</Badge>
             <Badge>{template.role.name}</Badge>
             <span>
-              {template.steps.length} steps · {template.goals.length} goals · used by {template.plans.length} plan{template.plans.length === 1 ? '' : 's'}
+              {template.steps.length} steps · {template.goals.length} goals · used by {template.plans.length} plan
+              {template.plans.length === 1 ? '' : 's'}
             </span>
           </p>
         </div>
@@ -79,7 +90,9 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
         </Drawer>
       </div>
 
-      <div className={`mb-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 ${behind ? 'border-brand-200 bg-brand-50' : 'border-slate-200 bg-white'}`}>
+      <div
+        className={`mb-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-4 ${behind ? 'border-brand-200 bg-brand-50' : 'border-slate-200 bg-white'}`}
+      >
         <p className={`flex items-center gap-2 text-sm ${behind ? 'text-brand-800' : 'text-slate-600'}`}>
           <RefreshCw size={16} />
           {behind
@@ -97,6 +110,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-xl font-bold tracking-tight text-slate-900">Steps</h2>
         <Drawer
+          wide
           key={`steps-${template.steps.length}`}
           title="Add a step"
           triggerClassName={buttonClass}
@@ -126,7 +140,13 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
               <span className="text-xs font-medium text-slate-500">{group.items.length} steps</span>
               <div className="flex items-center">
                 <MoveButtons action={moveTemplateModule} fields={{ templateId: template.id, module: group.module }} />
-                <Drawer key={group.module} title="Rename module" triggerClassName={iconButtonClass} triggerLabel="Rename module" trigger={<Pencil size={15} />}>
+                <Drawer
+                  key={group.module}
+                  title="Rename module"
+                  triggerClassName={iconButtonClass}
+                  triggerLabel="Rename module"
+                  trigger={<Pencil size={15} />}
+                >
                   <form action={renameTemplateModule} className="space-y-4">
                     <input type="hidden" name="templateId" value={template.id} />
                     <input type="hidden" name="module" value={group.module} />
@@ -146,7 +166,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
                   <li key={step.id} className="flex items-start gap-3 px-4 py-3 sm:px-5">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-slate-900">{step.title}</p>
-                      {step.explanation && <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{step.explanation}</p>}
+                      {step.explanation && <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{toPlainText(step.explanation)}</p>}
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                         {step.week != null && (
                           <span className="inline-flex items-center gap-1">
@@ -168,7 +188,14 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
                     </div>
                     <div className="flex shrink-0 items-center">
                       <MoveButtons action={moveTemplateStep} fields={{ templateId: template.id, stepId: step.id }} />
-                      <Drawer key={stepVersion(step)} title="Edit step" triggerClassName={iconButtonClass} triggerLabel="Edit step" trigger={<Pencil size={15} />}>
+                      <Drawer
+                        wide
+                        key={stepVersion(step)}
+                        title="Edit step"
+                        triggerClassName={iconButtonClass}
+                        triggerLabel="Edit step"
+                        trigger={<Pencil size={15} />}
+                      >
                         <form action={updateTemplateStep} className="space-y-4">
                           <input type="hidden" name="templateId" value={template.id} />
                           <input type="hidden" name="stepId" value={step.id} />
@@ -234,7 +261,13 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
                 </p>
               </div>
               <div className="flex shrink-0 items-center">
-                <Drawer key={`${goal.title}|${goal.withinWeeks}`} title="Edit goal" triggerClassName={iconButtonClass} triggerLabel="Edit goal" trigger={<Pencil size={15} />}>
+                <Drawer
+                  key={`${goal.title}|${goal.withinWeeks}`}
+                  title="Edit goal"
+                  triggerClassName={iconButtonClass}
+                  triggerLabel="Edit goal"
+                  trigger={<Pencil size={15} />}
+                >
                   <form action={updateTemplateGoal} className="space-y-4">
                     <input type="hidden" name="templateId" value={template.id} />
                     <input type="hidden" name="goalId" value={goal.id} />
@@ -264,7 +297,8 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
         <CardTitle>Danger zone</CardTitle>
         {template.plans.length > 0 && (
           <p className="mb-3 text-sm text-slate-600">
-            The {template.plans.length} plan{template.plans.length === 1 ? '' : 's'} made from it keep their steps and progress, but can no longer receive template updates.
+            The {template.plans.length} plan{template.plans.length === 1 ? '' : 's'} made from it keep their steps and progress, but can no longer
+            receive template updates.
           </p>
         )}
         <form action={deleteTemplate} className="flex flex-wrap items-center gap-3 text-sm">

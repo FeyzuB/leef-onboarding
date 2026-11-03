@@ -73,7 +73,13 @@ export function StatusBadge({ status }: { status: string }) {
 export function ProgressBar({ percent, showLabel = true }: { percent: number; showLabel?: boolean }) {
   return (
     <div className="flex items-center gap-2">
-      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+      <div
+        className="h-2 w-full overflow-hidden rounded-full bg-slate-100"
+        role="progressbar"
+        aria-valuenow={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
         <div className="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all" style={{ width: `${percent}%` }} />
       </div>
       {showLabel && <span className="w-10 text-right text-xs font-semibold text-slate-700">{percent}%</span>}
@@ -87,7 +93,14 @@ export function ProgressRing({ percent, size = 72, light = false }: { percent: n
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
+    <div
+      className="relative shrink-0"
+      style={{ width: size, height: size }}
+      role="progressbar"
+      aria-valuenow={percent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className={light ? 'stroke-white/25' : 'stroke-slate-100'} />
         <circle
@@ -109,7 +122,14 @@ export function ProgressRing({ percent, size = 72, light = false }: { percent: n
   );
 }
 
-const avatarColors = ['bg-brand-100 text-brand-800', 'bg-accent-100 text-accent-700', 'bg-sky-100 text-sky-800', 'bg-violet-100 text-violet-800', 'bg-amber-100 text-amber-800', 'bg-rose-100 text-rose-800'];
+const avatarColors = [
+  'bg-brand-100 text-brand-800',
+  'bg-accent-100 text-accent-700',
+  'bg-sky-100 text-sky-800',
+  'bg-violet-100 text-violet-800',
+  'bg-amber-100 text-amber-800',
+  'bg-rose-100 text-rose-800',
+];
 
 export function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -124,7 +144,10 @@ export function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md'
   const hash = [...name].reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
   const dims = { sm: 'h-7 w-7 text-[11px]', md: 'h-9 w-9 text-xs', lg: 'h-12 w-12 text-sm' }[size];
   return (
-    <span aria-hidden className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold ${dims} ${avatarColors[hash % avatarColors.length]}`}>
+    <span
+      aria-hidden
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold ${dims} ${avatarColors[hash % avatarColors.length]}`}
+    >
       {initials(name)}
     </span>
   );

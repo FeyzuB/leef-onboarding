@@ -1,5 +1,6 @@
 'use server';
 
+import { cleanExplanation } from '@/lib/richText';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { User } from '@prisma/client';
@@ -98,7 +99,7 @@ function stepFields(form: FormData) {
   return {
     module: required(form, 'module', 'Module', 120),
     title: required(form, 'title', 'Title', 200),
-    explanation: text(form, 'explanation', 4000),
+    explanation: cleanExplanation(text(form, 'explanation', 20000)),
     links: parseLinks(text(form, 'links', 4000)),
     ...contactFields(form),
     doneWhen: text(form, 'doneWhen', 500),

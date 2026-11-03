@@ -13,12 +13,15 @@ export function Drawer({
   trigger,
   triggerClassName,
   triggerLabel,
+  wide = false,
   children,
 }: {
   title: string;
   trigger: ReactNode;
   triggerClassName: string;
   triggerLabel?: string;
+  /** A wider panel, for forms with a lot of text such as steps. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -41,8 +44,13 @@ export function Drawer({
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={title}>
-          <button type="button" aria-label="Close" className="absolute inset-0 cursor-default bg-slate-900/30 backdrop-blur-[1px]" onClick={() => setOpen(false)} />
-          <div className="relative flex h-full w-full max-w-xl flex-col bg-white shadow-2xl">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 cursor-default bg-slate-900/30 backdrop-blur-[1px]"
+            onClick={() => setOpen(false)}
+          />
+          <div className={`relative flex h-full w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} flex-col bg-white shadow-2xl`}>
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <h2 className="text-lg font-bold text-slate-900">{title}</h2>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">

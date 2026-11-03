@@ -79,7 +79,10 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
   const modules = groups.map((g) => g.module);
   const stats = planStats(plan, now, APP_TIMEZONE);
   const behind = plan.template && plan.templateVersion < plan.template.version;
-  const next = nextStep(groups.flatMap((g) => g.items), plan.startDate);
+  const next = nextStep(
+    groups.flatMap((g) => g.items),
+    plan.startDate,
+  );
   const overdue = stats.overdueSteps + stats.overdueGoals;
   const week = currentWeek(plan.startDate, now, APP_TIMEZONE);
 
@@ -234,6 +237,7 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
       <div className="mb-4 flex items-center justify-between gap-2">
         <h2 className="text-xl font-bold tracking-tight text-slate-900">Steps</h2>
         <Drawer
+          wide
           key={`steps-${plan.steps.length}`}
           title="Add a step to this plan"
           triggerClassName={buttonClass}
@@ -276,7 +280,11 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
                   const timing = stepTimingLabel(step, plan.startDate);
                   const late = !done && isOverdue(stepDueDate(step, plan.startDate), now, APP_TIMEZONE);
                   return (
-                    <li key={step.id} id={`step-${step.id}`} className={`flex items-start gap-3 px-4 py-3 sm:px-5 ${step.id === next?.id ? 'bg-accent-50/60' : ''}`}>
+                    <li
+                      key={step.id}
+                      id={`step-${step.id}`}
+                      className={`flex items-start gap-3 px-4 py-3 sm:px-5 ${step.id === next?.id ? 'bg-accent-50/60' : ''}`}
+                    >
                       <div className="pt-0.5">
                         <StepCheck step={step} />
                       </div>
@@ -297,6 +305,7 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
                       <div className="flex shrink-0 items-center">
                         <MoveButtons action={movePlanStep} fields={{ planId: plan.id, stepId: step.id }} />
                         <Drawer
+                          wide
                           key={stepVersion(step)}
                           title="Edit step"
                           triggerClassName={iconButtonClass}
@@ -313,7 +322,10 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
                         <form action={removePlanStep}>
                           <input type="hidden" name="planId" value={plan.id} />
                           <input type="hidden" name="stepId" value={step.id} />
-                          <ConfirmButton message={`Remove “${step.title}” from this plan?`} className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600">
+                          <ConfirmButton
+                            message={`Remove “${step.title}” from this plan?`}
+                            className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          >
                             <Trash2 size={15} aria-label="Remove step" />
                           </ConfirmButton>
                         </form>
