@@ -24,7 +24,7 @@ export async function login(_: FormState, form: FormData): Promise<FormState> {
   const password = rawPassword(form, 'password');
   if (!username || !password) return { error: 'Enter your username and password' };
 
-  const address = clientAddress();
+  const address = await clientAddress();
   if (await isBraked(username, address)) {
     return { error: 'Too many failed attempts. Try again in 15 minutes or ask your lead to reset your password.' };
   }
@@ -45,7 +45,7 @@ export async function logout() {
   // Bump the session version so a copied session cookie stops working too.
   const user = await getCurrentUser();
   if (user) await prisma.user.update({ where: { id: user.id }, data: { sessionVersion: { increment: 1 } } });
-  endSession();
+  await endSession();
   redirect('/login');
 }
 

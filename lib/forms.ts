@@ -1,6 +1,6 @@
 import type { ContactRole } from '@prisma/client';
 
-/** Result shape for forms that show an inline message (used with useFormState). */
+/** Result shape for forms that show an inline message (used with useActionState). */
 export type FormState = { error?: string; success?: string };
 
 export function text(form: FormData, key: string, max = 4000): string {

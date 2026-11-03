@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { SESSION_COOKIE, sessionCookieOptions, signSession, verifySession } from '@/lib/session';
 
 export async function getCurrentUser(): Promise<User | null> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const session = await verifySession(token);
   if (!session) return null;
@@ -16,11 +16,11 @@ export async function getCurrentUser(): Promise<User | null> {
 
 export async function startSession(user: Pick<User, 'id' | 'sessionVersion'>) {
   const token = await signSession({ userId: user.id, version: user.sessionVersion });
-  cookies().set(SESSION_COOKIE, token, sessionCookieOptions);
+  (await cookies()).set(SESSION_COOKIE, token, sessionCookieOptions);
 }
 
-export function endSession() {
-  cookies().delete(SESSION_COOKIE);
+export async function endSession() {
+  (await cookies()).delete(SESSION_COOKIE);
 }
 
 /** Any logged-in user. Sends users with a temporary password to the change-password page. */

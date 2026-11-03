@@ -16,7 +16,8 @@ function BackLink() {
   );
 }
 
-export default async function NewPlanPage({ searchParams }: { searchParams: { userId?: string } }) {
+export default async function NewPlanPage(props: { searchParams: Promise<{ userId?: string }> }) {
+  const searchParams = await props.searchParams;
   const actor = await requireLead();
   const scope = teamScope(actor);
   const [newHires, templates, leads, people] = await Promise.all([

@@ -17,8 +17,8 @@ const LIMITS = [
 const KEEP_MS = 24 * 60 * 60 * 1000;
 
 /** The client address. On Vercel these headers are set by the platform; elsewhere they may be missing. */
-export function clientAddress(): string {
-  const h = headers();
+export async function clientAddress(): Promise<string> {
+  const h = await headers();
   return h.get('x-real-ip')?.trim() || h.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 }
 

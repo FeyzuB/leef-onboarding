@@ -26,7 +26,8 @@ import { prisma } from '@/lib/prisma';
 
 const deleteIconClass = 'rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600';
 
-export default async function TemplateEditorPage({ params }: { params: { id: string } }) {
+export default async function TemplateEditorPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const actor = await requireLead();
   const template = await prisma.template.findUnique({
     where: { id: params.id },

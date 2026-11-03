@@ -1,7 +1,7 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { type ReactNode, useActionState, useEffect, useRef } from 'react';
+import { useFormStatus } from 'react-dom';
 import type { FormState } from '@/lib/forms';
 import { buttonClass } from '@/components/ui';
 
@@ -66,7 +66,7 @@ export function StatefulForm({
   className?: string;
   resetOnSuccess?: boolean;
 }) {
-  const [state, formAction] = useFormState(action, {});
+  const [state, formAction] = useActionState(action, {});
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {

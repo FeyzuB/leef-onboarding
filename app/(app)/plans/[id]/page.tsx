@@ -53,7 +53,8 @@ import {
 } from '@/lib/logic';
 import { prisma } from '@/lib/prisma';
 
-export default async function PlanEditorPage({ params }: { params: { id: string } }) {
+export default async function PlanEditorPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const actor = await requireLead();
   const plan = await prisma.plan.findUnique({
     where: { id: params.id },
