@@ -34,13 +34,15 @@ enum GoalStatus {
 }
 
 model Team {
-  id         String         @id @default(uuid())
-  name       String         @unique
-  createdAt  DateTime       @default(now())
-  users      User[]
-  templates  Template[]
-  resources  TeamResource[]
-  orgEntries OrgEntry[]
+  id          String         @id @default(uuid())
+  name        String         @unique
+  createdAt   DateTime       @default(now())
+  users       User[]
+  templates   Template[]
+  resources   TeamResource[]
+  // Who is who: people in this team, and people who manage it.
+  orgMembers  OrgEntry[]     @relation("OrgEntryTeams")
+  orgManagers OrgEntry[]     @relation("OrgEntryManages")
 }
 
 model Role {
@@ -190,17 +192,18 @@ model TeamResource {
 }
 
 model OrgEntry {
-  id          String     @id @default(uuid())
-  name        String
-  jobTitle    String     @default("")
-  teamId      String?
-  team        Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
-  reportsToId String?
-  reportsTo   OrgEntry?  @relation("ReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
-  reports     OrgEntry[] @relation("ReportsTo")
-  managerOf   Plan[]     @relation("PlanManager")
-  buddyOf     Plan[]     @relation("PlanBuddy")
-  createdAt   DateTime   @default(now())
+  id           String     @id @default(uuid())
+  name         String
+  jobTitle     String     @default("")
+  // A person can be in several teams and manage several teams; the chart's lines follow reportsTo.
+  teams        Team[]     @relation("OrgEntryTeams")
+  managedTeams Team[]     @relation("OrgEntryManages")
+  reportsToId  String?
+  reportsTo    OrgEntry?  @relation("ReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  reports      OrgEntry[] @relation("ReportsTo")
+  managerOf    Plan[]     @relation("PlanManager")
+  buddyOf      Plan[]     @relation("PlanBuddy")
+  createdAt    DateTime   @default(now())
 }
 
 // One row per failed login, so the brake on password guessing works across serverless instances.

@@ -8,7 +8,37 @@ import { Avatar, Badge, EmptyState, Field, PageHeader, buttonClass, inputClass }
 import { isLead, requireUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
-type Entry = OrgEntry & { team: Team | null };
+type Entry = OrgEntry & { teams: Team[]; managedTeams: Team[] };
+
+function TeamChecks({ label, name, teams, selected = [], hint }: { label: string; name: string; teams: Team[]; selected?: Team[]; hint?: string }) {
+  return (
+    <fieldset>
+      <legend className="mb-1.5 block text-sm font-medium text-slate-700">{label}</legend>
+      {teams.length === 0 ? (
+        <p className="text-sm text-slate-500">No teams yet. An admin adds them on Teams &amp; roles.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {teams.map((team) => (
+            <label
+              key={team.id}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50 has-[:checked]:text-brand-800"
+            >
+              <input
+                type="checkbox"
+                name={name}
+                value={team.id}
+                defaultChecked={selected.some((t) => t.id === team.id)}
+                className="accent-brand-600"
+              />
+              {team.name}
+            </label>
+          ))}
+        </div>
+      )}
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    </fieldset>
+  );
+}
 
 function EntryFields({ entry, entries, teams }: { entry?: Entry; entries: Entry[]; teams: Team[] }) {
   return (
@@ -19,16 +49,14 @@ function EntryFields({ entry, entries, teams }: { entry?: Entry; entries: Entry[
       <Field label="Job title">
         <input name="jobTitle" maxLength={120} defaultValue={entry?.jobTitle} className={inputClass} />
       </Field>
-      <Field label="Team">
-        <select name="teamId" defaultValue={entry?.teamId ?? ''} className={inputClass}>
-          <option value="">No team</option>
-          {teams.map((team) => (
-            <option key={team.id} value={team.id}>
-              {team.name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <TeamChecks label="Member of" name="teamIds" teams={teams} selected={entry?.teams} />
+      <TeamChecks
+        label="Manages"
+        name="managedTeamIds"
+        teams={teams}
+        selected={entry?.managedTeams}
+        hint="Leave empty if this person manages no team."
+      />
       <Field label="Reports to">
         <select name="reportsToId" defaultValue={entry?.reportsToId ?? ''} className={inputClass}>
           <option value="">Nobody (top of the organisation)</option>
@@ -54,7 +82,7 @@ function EntryActions({ entry, reports, entries, teams }: { entry: Entry; report
     <div className="flex shrink-0 items-center rounded-lg bg-white/90 opacity-100 transition sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
       {/* Rebuilt whenever the saved values change, so it never shows or re-saves stale values. */}
       <Drawer
-        key={[entry.name, entry.jobTitle, entry.teamId, entry.reportsToId].join('|')}
+        key={[entry.name, entry.jobTitle, entry.reportsToId, ...entry.teams.map((t) => t.id), '/', ...entry.managedTeams.map((t) => t.id)].join('|')}
         title={`Edit ${entry.name}`}
         triggerClassName={iconButtonClass}
         triggerLabel="Edit"
@@ -94,9 +122,20 @@ function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; t
       <Avatar name={entry.name} size="lg" />
       <p className="mt-2 line-clamp-2 w-full break-words font-semibold text-slate-900">{entry.name}</p>
       {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-600">{entry.jobTitle}</p>}
-      {entry.team && (
-        <p className="mt-1.5">
-          <Badge tone="brand">{entry.team.name}</Badge>
+      {(entry.teams.length > 0 || entry.managedTeams.length > 0) && (
+        <p className="mt-1.5 flex flex-wrap justify-center gap-1">
+          {entry.managedTeams.map((team) => (
+            <Badge key={`m-${team.id}`} tone="accent">
+              Manages {team.name}
+            </Badge>
+          ))}
+          {entry.teams
+            .filter((team) => !entry.managedTeams.some((m) => m.id === team.id))
+            .map((team) => (
+              <Badge key={team.id} tone="brand">
+                {team.name}
+              </Badge>
+            ))}
         </p>
       )}
     </div>
@@ -116,7 +155,7 @@ function PersonRow({ entry, tree }: { entry: Entry; tree: TreeProps }) {
         {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-500">{entry.jobTitle}</p>}
       </div>
       {tree.canEdit && (
-        <div className="absolute right-1 top-1/2 -translate-y-1/2">
+        <div className="absolute inset-y-0 right-1 flex items-center">
           <EntryActions entry={entry} reports={0} entries={tree.entries} teams={tree.teams} />
         </div>
       )}
@@ -170,7 +209,10 @@ export default async function OrganogramPage() {
   const user = await requireUser();
   const canEdit = isLead(user);
   const [entries, teams] = await Promise.all([
-    prisma.orgEntry.findMany({ include: { team: true }, orderBy: { name: 'asc' } }),
+    prisma.orgEntry.findMany({
+      include: { teams: { orderBy: { name: 'asc' } }, managedTeams: { orderBy: { name: 'asc' } } },
+      orderBy: { name: 'asc' },
+    }),
     prisma.team.findMany({ orderBy: { name: 'asc' } }),
   ]);
 
