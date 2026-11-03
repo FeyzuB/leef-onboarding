@@ -143,7 +143,11 @@ function PersonCard({ entry, reports, tree }: { entry: Entry; reports: number; t
 }
 
 /** A person without reports, as a compact row in a manager's team box. */
-function PersonRow({ entry, tree }: { entry: Entry; tree: TreeProps }) {
+function PersonRow({ entry, manager, tree }: { entry: Entry; manager: Entry; tree: TreeProps }) {
+  // The box already says which team its manager runs; only show teams that tell something extra:
+  // all of them when someone is in several teams, or the one team when it differs from the manager's.
+  const managerTeams = new Set([...manager.teams, ...manager.managedTeams].map((t) => t.id));
+  const showTeams = entry.teams.length > 1 || entry.teams.some((t) => !managerTeams.has(t.id));
   return (
     <div
       id={`person-${entry.id}`}
@@ -153,6 +157,24 @@ function PersonRow({ entry, tree }: { entry: Entry; tree: TreeProps }) {
       <div className="min-w-0 flex-1 text-left">
         <p className="line-clamp-2 break-words text-sm font-semibold text-slate-900">{entry.name}</p>
         {entry.jobTitle && <p className="line-clamp-2 text-xs text-slate-500">{entry.jobTitle}</p>}
+        {showTeams && (
+          <p className="mt-1 flex flex-wrap gap-1">
+            {entry.teams.map((team) => (
+              <Badge key={team.id} tone="brand">
+                {team.name}
+              </Badge>
+            ))}
+          </p>
+        )}
+        {entry.managedTeams.length > 0 && (
+          <p className="mt-1 flex flex-wrap gap-1">
+            {entry.managedTeams.map((team) => (
+              <Badge key={team.id} tone="accent">
+                Manages {team.name}
+              </Badge>
+            ))}
+          </p>
+        )}
       </div>
       {tree.canEdit && (
         <div className="absolute inset-y-0 right-1 flex items-center">
@@ -183,7 +205,7 @@ function Node({ entry, tree, depth }: { entry: Entry; tree: TreeProps; depth: nu
             <ul className="w-full max-w-[15rem] space-y-1.5 rounded-2xl bg-brand-50/60 p-2 ring-1 ring-brand-100">
               {reports.map((child) => (
                 <li key={child.id}>
-                  <PersonRow entry={child} tree={tree} />
+                  <PersonRow entry={child} manager={entry} tree={tree} />
                 </li>
               ))}
             </ul>
