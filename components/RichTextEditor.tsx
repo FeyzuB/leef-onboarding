@@ -1,12 +1,47 @@
 'use client';
 
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Color, TextStyle } from '@tiptap/extension-text-style';
-import { Bold, Italic, Link2, List, ListOrdered, RemoveFormatting, SquareDashed, Underline } from 'lucide-react';
+import Image from '@tiptap/extension-image';
+import type { EditorView } from '@tiptap/pm/view';
+import { Bold, ImagePlus, Italic, Link2, List, ListOrdered, RemoveFormatting, SquareDashed, Underline } from 'lucide-react';
 import { inputClass } from '@/components/ui';
 import { plainToHtml } from '@/lib/richTextFormat';
+
+const MAX_WIDTH = 1200; // px; screenshots stay sharp, files stay small
+const MAX_BYTES = 900_000; // per image, after shrinking
+
+/** Reads an image file and shrinks it to at most MAX_WIDTH wide; screenshots stay PNG, photos become JPEG. */
+async function toDataUrl(file: File): Promise<string | null> {
+  if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) return null;
+  // Read as a data URL: the page's content security policy allows data: images, not blob: ones.
+  const original = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new window.Image();
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = original;
+    });
+    const scale = Math.min(1, MAX_WIDTH / img.naturalWidth);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    let data = canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85);
+    if (data.length * 0.75 > MAX_BYTES) data = canvas.toDataURL('image/jpeg', 0.75);
+    return data.length * 0.75 > MAX_BYTES ? null : data;
+  } catch {
+    return null;
+  }
+}
 
 function ToolButton({ active, label, onClick, children }: { active?: boolean; label: string; onClick: () => void; children: ReactNode }) {
   return (
@@ -33,6 +68,23 @@ export function RichTextEditor({ name, defaultValue = '' }: { name: string; defa
   const [html, setHtml] = useState(() => plainToHtml(defaultValue));
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const [imageError, setImageError] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function insertImages(view: EditorView, files: File[], pos?: number) {
+    setImageError('');
+    for (const file of files) {
+      const src = await toDataUrl(file);
+      if (!src) {
+        setImageError('That image could not be added: use PNG, JPEG, GIF or WebP, and keep it under about 1 MB.');
+        continue;
+      }
+      const node = view.state.schema.nodes.image.create({ src, alt: file.name.replace(/\.[a-z]+$/i, '') });
+      const at = pos ?? view.state.selection.from;
+      view.dispatch(view.state.tr.insert(at, node));
+    }
+  }
+  const imageFiles = (list: FileList | null | undefined) => Array.from(list ?? []).filter((f) => f.type.startsWith('image/'));
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -44,9 +96,26 @@ export function RichTextEditor({ name, defaultValue = '' }: { name: string; defa
       }),
       TextStyle,
       Color,
+      Image.configure({ allowBase64: true }),
     ],
     content: html,
-    editorProps: { attributes: { class: 'rich-text min-h-48 px-3 py-2.5 text-sm text-slate-800 focus:outline-none' } },
+    editorProps: {
+      attributes: { class: 'rich-text min-h-48 px-3 py-2.5 text-sm text-slate-800 focus:outline-none' },
+      // Pasted or dropped screenshots become images in the text.
+      handlePaste: (view, event) => {
+        const files = imageFiles(event.clipboardData?.files);
+        if (!files.length) return false;
+        void insertImages(view, files);
+        return true;
+      },
+      handleDrop: (view, event) => {
+        const files = imageFiles(event.dataTransfer?.files);
+        if (!files.length) return false;
+        const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+        void insertImages(view, files, pos);
+        return true;
+      },
+    },
     onUpdate: ({ editor }) => setHtml(editor.isEmpty ? '' : editor.getHTML()),
   });
 
@@ -114,6 +183,20 @@ export function RichTextEditor({ name, defaultValue = '' }: { name: string; defa
           <SquareDashed size={15} />
         </ToolButton>
         <span className="mx-1 h-5 w-px bg-slate-200" />
+        <ToolButton label="Add an image (or paste a screenshot)" onClick={() => fileInput.current?.click()}>
+          <ImagePlus size={15} />
+        </ToolButton>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (editor) void insertImages(editor.view, imageFiles(e.target.files));
+            e.target.value = '';
+          }}
+        />
         <ToolButton label="Clear formatting" onClick={() => editor?.chain().focus().unsetAllMarks().clearNodes().run()}>
           <RemoveFormatting size={15} />
         </ToolButton>
@@ -143,7 +226,8 @@ export function RichTextEditor({ name, defaultValue = '' }: { name: string; defa
           </button>
         </div>
       )}
-      <div className="max-h-[50vh] overflow-y-auto">
+      {imageError && <p className="border-b border-slate-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">{imageError}</p>}
+      <div className="max-h-[60vh] overflow-y-auto">
         <EditorContent editor={editor} />
       </div>
     </div>

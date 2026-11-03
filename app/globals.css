@@ -54,3 +54,6 @@ details[open] > summary .details-chevron {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+.rich-text img {
+  @apply my-2 h-auto max-w-full rounded-lg ring-1 ring-slate-200;
+}

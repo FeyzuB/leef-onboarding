@@ -1,5 +1,6 @@
 'use server';
 
+import { guideIdField } from '@/lib/guides';
 import { cleanExplanation } from '@/lib/richText';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -99,7 +100,7 @@ function stepFields(form: FormData) {
   return {
     module: required(form, 'module', 'Module', 120),
     title: required(form, 'title', 'Title', 200),
-    explanation: cleanExplanation(text(form, 'explanation', 20000)),
+    explanation: cleanExplanation(text(form, 'explanation', 3_500_000)),
     links: parseLinks(text(form, 'links', 4000)),
     ...contactFields(form),
     doneWhen: text(form, 'doneWhen', 500),
@@ -118,7 +119,7 @@ function optionalDate(form: FormData, key: string, message: string) {
 
 export async function addPlanStep(form: FormData) {
   const plan = await editablePlan(form);
-  const fields = stepFields(form);
+  const fields = { ...stepFields(form), guideId: await guideIdField(form) };
   await prisma.$transaction(async (tx) => {
     const created = await tx.planStep.create({
       data: { ...fields, planId: plan.id, tailored: true, position: plan.steps.length },
@@ -132,7 +133,7 @@ export async function updatePlanStep(form: FormData) {
   const plan = await editablePlan(form);
   const stepId = text(form, 'stepId');
   if (!plan.steps.some((s) => s.id === stepId)) throw new Error('Step not found');
-  const fields = stepFields(form);
+  const fields = { ...stepFields(form), guideId: await guideIdField(form) };
   await prisma.$transaction(async (tx) => {
     const updated = await tx.planStep.update({ where: { id: stepId }, data: { ...fields, tailored: true } });
     const steps = plan.steps.map((s) =>

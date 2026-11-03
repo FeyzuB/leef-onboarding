@@ -32,6 +32,7 @@ function stepContent(step: TemplateStep) {
     contactRole: step.contactRole,
     doneWhen: step.doneWhen,
     week: step.week,
+    guideId: step.guideId,
   };
 }
 

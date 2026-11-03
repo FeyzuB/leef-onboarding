@@ -1,5 +1,6 @@
 'use server';
 
+import { guideIdField } from '@/lib/guides';
 import { cleanExplanation } from '@/lib/richText';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -20,7 +21,7 @@ function stepFields(form: FormData) {
   return {
     module: required(form, 'module', 'Module', 120),
     title: required(form, 'title', 'Title', 200),
-    explanation: cleanExplanation(text(form, 'explanation', 20000)),
+    explanation: cleanExplanation(text(form, 'explanation', 3_500_000)),
     links: parseLinks(text(form, 'links', 4000)),
     ...contactFields(form),
     doneWhen: text(form, 'doneWhen', 500),
@@ -62,7 +63,7 @@ export async function deleteTemplate(form: FormData) {
 
 export async function addTemplateStep(form: FormData) {
   const template = await loadTemplate(text(form, 'templateId'));
-  const fields = stepFields(form);
+  const fields = { ...stepFields(form), guideId: await guideIdField(form) };
   await prisma.$transaction(async (tx) => {
     const created = await tx.templateStep.create({
       data: { ...fields, templateId: template.id, position: template.steps.length },
@@ -77,7 +78,7 @@ export async function updateTemplateStep(form: FormData) {
   const template = await loadTemplate(text(form, 'templateId'));
   const stepId = text(form, 'stepId');
   if (!template.steps.some((s) => s.id === stepId)) throw new Error('Step not found');
-  const fields = stepFields(form);
+  const fields = { ...stepFields(form), guideId: await guideIdField(form) };
   await prisma.$transaction(async (tx) => {
     const updated = await tx.templateStep.update({ where: { id: stepId }, data: fields });
     // A step moved to another module goes to the end of that module.

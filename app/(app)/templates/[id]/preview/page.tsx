@@ -42,6 +42,7 @@ export default async function TemplatePreviewPage(props: { params: Promise<{ id:
     contactRole: step.contactRole,
     doneWhen: step.doneWhen,
     week: step.week,
+    guideId: step.guideId,
     dueDate: null,
     status: 'OPEN',
     note: '',

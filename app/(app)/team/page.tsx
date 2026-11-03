@@ -59,9 +59,21 @@ function iconFor(title: string) {
   return ICONS.find(([pattern]) => pattern.test(title))?.[1] ?? MapPin;
 }
 
-function ResourceFields({ resource }: { resource?: TeamResource }) {
+// Suggested groups; leads can type their own.
+const CATEGORY_SUGGESTIONS = ['Development', 'Support & customers', 'Company'];
+
+function ResourceFields({ resource, categories }: { resource?: TeamResource; categories: string[] }) {
+  const listId = `categories-${resource?.id ?? 'new'}`;
   return (
     <div className="space-y-4">
+      <Field label="Category" hint="Groups the tools on this page, e.g. Development or Company">
+        <input name="category" maxLength={60} list={listId} defaultValue={resource?.category} className={inputClass} />
+        <datalist id={listId}>
+          {categories.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+      </Field>
       <Field label="What">
         <input name="title" required maxLength={120} defaultValue={resource?.title} placeholder="e.g. Wachtwoorden" className={inputClass} />
       </Field>
@@ -78,6 +90,22 @@ function ResourceFields({ resource }: { resource?: TeamResource }) {
   );
 }
 
+function categoriesOf(resources: TeamResource[]): string[] {
+  return [...new Set([...CATEGORY_SUGGESTIONS, ...resources.map((r) => r.category).filter(Boolean)])];
+}
+
+/** Tools grouped by category, in the order of their first tool; uncategorised ones last, as "Other". */
+function groupByCategory(resources: TeamResource[]): { name: string; items: TeamResource[] }[] {
+  const groups: { name: string; items: TeamResource[] }[] = [];
+  for (const resource of resources) {
+    const name = resource.category || 'Other';
+    let group = groups.find((g) => g.name === name);
+    if (!group) groups.push((group = { name, items: [] }));
+    group.items.push(resource);
+  }
+  return groups.sort((a, b) => Number(a.name === 'Other') - Number(b.name === 'Other'));
+}
+
 export default async function TeamPage() {
   const user = await requireUser();
   const teams = await prisma.team.findMany({
@@ -88,7 +116,7 @@ export default async function TeamPage() {
 
   return (
     <>
-      <PageHeader title="Where to find things" intro="The tools and places the team uses every day." />
+      <PageHeader title="Tools" intro="The tools the team uses every day, one click away. How things work is in the Guides." />
       {teams.length === 0 && <EmptyState>You are not in a team yet.</EmptyState>}
       <div className="space-y-10">
         {teams.map((team) => {
@@ -100,17 +128,17 @@ export default async function TeamPage() {
                 {canEdit && (
                   <Drawer
                     key={`res-${team.resources.length}`}
-                    title={`Add an entry${teams.length > 1 ? ` for ${team.name}` : ''}`}
+                    title={`Add a tool${teams.length > 1 ? ` for ${team.name}` : ''}`}
                     triggerClassName={buttonClass}
                     trigger={
                       <>
-                        <Plus size={16} /> Add entry
+                        <Plus size={16} /> Add tool
                       </>
                     }
                   >
                     <AddForm action={addResource} className="space-y-4">
                       <input type="hidden" name="teamId" value={team.id} />
-                      <ResourceFields />
+                      <ResourceFields categories={categoriesOf(team.resources)} />
                       <SubmitButton>Add entry</SubmitButton>
                     </AddForm>
                   </Drawer>
@@ -119,62 +147,69 @@ export default async function TeamPage() {
               {team.resources.length === 0 ? (
                 <EmptyState>Nothing listed yet.</EmptyState>
               ) : (
-                <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {team.resources.map((resource) => {
-                    const Icon = iconFor(resource.title);
-                    return (
-                      <li
-                        key={resource.id}
-                        className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition hover:shadow-lift"
-                      >
-                        <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
-                          <Icon size={20} />
-                        </span>
-                        <h3 className="font-semibold text-slate-900">{resource.title}</h3>
-                        {resource.url && isSafeUrl(resource.url) ? (
-                          <a
-                            href={resource.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 inline-flex items-center gap-1 break-all text-sm font-medium text-brand-700 hover:underline"
-                          >
-                            {resource.location} <ExternalLink size={13} className="shrink-0" />
-                          </a>
-                        ) : (
-                          <p className="mt-1 break-words text-sm font-medium text-slate-700">{resource.location}</p>
-                        )}
-                        {resource.note && <p className="mt-2 text-sm text-slate-500">{resource.note}</p>}
-                        {canEdit && (
-                          <div className="absolute right-3 top-3 flex items-center rounded-lg bg-white/90 opacity-100 transition sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-                            <MoveButtons action={moveResource} fields={{ resourceId: resource.id }} />
-                            <Drawer
-                              key={[resource.title, resource.location, resource.note, resource.url].join('|')}
-                              title="Edit entry"
-                              triggerClassName={iconButtonClass}
-                              triggerLabel="Edit entry"
-                              trigger={<Pencil size={15} />}
+                <div className="space-y-8">
+                  {groupByCategory(team.resources).map((group) => (
+                    <div key={group.name}>
+                      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{group.name}</h3>
+                      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {group.items.map((resource) => {
+                          const Icon = iconFor(resource.title);
+                          return (
+                            <li
+                              key={resource.id}
+                              className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition hover:shadow-lift"
                             >
-                              <form action={updateResource} className="space-y-4">
-                                <input type="hidden" name="resourceId" value={resource.id} />
-                                <ResourceFields resource={resource} />
-                                <SubmitButton>Save entry</SubmitButton>
-                              </form>
-                            </Drawer>
-                            <form action={deleteResource}>
-                              <input type="hidden" name="resourceId" value={resource.id} />
-                              <ConfirmButton
-                                message={`Delete “${resource.title}”?`}
-                                className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2 size={15} aria-label="Delete entry" />
-                              </ConfirmButton>
-                            </form>
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                              <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                                <Icon size={20} />
+                              </span>
+                              <h3 className="font-semibold text-slate-900">{resource.title}</h3>
+                              {resource.url && isSafeUrl(resource.url) ? (
+                                <a
+                                  href={resource.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-1 inline-flex items-center gap-1 break-all text-sm font-medium text-brand-700 hover:underline"
+                                >
+                                  {resource.location} <ExternalLink size={13} className="shrink-0" />
+                                </a>
+                              ) : (
+                                <p className="mt-1 break-words text-sm font-medium text-slate-700">{resource.location}</p>
+                              )}
+                              {resource.note && <p className="mt-2 text-sm text-slate-500">{resource.note}</p>}
+                              {canEdit && (
+                                <div className="absolute right-3 top-3 flex items-center rounded-lg bg-white/90 opacity-100 transition sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+                                  <MoveButtons action={moveResource} fields={{ resourceId: resource.id }} />
+                                  <Drawer
+                                    key={[resource.title, resource.location, resource.note, resource.url].join('|')}
+                                    title="Edit entry"
+                                    triggerClassName={iconButtonClass}
+                                    triggerLabel="Edit entry"
+                                    trigger={<Pencil size={15} />}
+                                  >
+                                    <form action={updateResource} className="space-y-4">
+                                      <input type="hidden" name="resourceId" value={resource.id} />
+                                      <ResourceFields resource={resource} categories={categoriesOf(team.resources)} />
+                                      <SubmitButton>Save entry</SubmitButton>
+                                    </form>
+                                  </Drawer>
+                                  <form action={deleteResource}>
+                                    <input type="hidden" name="resourceId" value={resource.id} />
+                                    <ConfirmButton
+                                      message={`Delete “${resource.title}”?`}
+                                      className="rounded-md p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      <Trash2 size={15} aria-label="Delete entry" />
+                                    </ConfirmButton>
+                                  </form>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               )}
             </section>
           );

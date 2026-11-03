@@ -64,9 +64,19 @@ export function stepVersion(step: {
   contactRole: string | null;
   week: number | null;
   dueDate?: Date | null;
+  guideId?: string | null;
 }): string {
   return JSON.stringify([
-    step.module, step.title, step.explanation, step.links, step.contact, step.contactRole, step.doneWhen, step.week, step.dueDate ?? null,
+    step.module,
+    step.title,
+    step.explanation,
+    step.links,
+    step.contact,
+    step.contactRole,
+    step.doneWhen,
+    step.week,
+    step.dueDate ?? null,
+    step.guideId ?? null,
   ]);
 }
 
@@ -142,10 +152,7 @@ export function formatLinks(links: Link[]): string {
 /** Reads links from a JSON column, dropping anything malformed or unsafe. */
 export function toLinks(value: unknown): Link[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (v): v is Link =>
-      !!v && typeof v === 'object' && typeof v.label === 'string' && typeof v.url === 'string' && isSafeUrl(v.url),
-  );
+  return value.filter((v): v is Link => !!v && typeof v === 'object' && typeof v.label === 'string' && typeof v.url === 'string' && isSafeUrl(v.url));
 }
 
 // ---------- Dates (all stored as UTC midnight) ----------
@@ -306,7 +313,10 @@ export function groupByPhase<T extends StepTiming & Positioned>(steps: T[], star
 /** Steps by due date, earliest first; steps without timing keep their plan order, after the dated ones. */
 export function byDueDate<T extends StepTiming>(steps: T[], startDate: Date): T[] {
   const time = (s: T) => stepDueDate(s, startDate)?.getTime() ?? Infinity;
-  return steps.map((step, index) => ({ step, index })).sort((a, b) => time(a.step) - time(b.step) || a.index - b.index).map((x) => x.step);
+  return steps
+    .map((step, index) => ({ step, index }))
+    .sort((a, b) => time(a.step) - time(b.step) || a.index - b.index)
+    .map((x) => x.step);
 }
 
 /** The step to do next: the open step that is due first, or the first open step when none has timing. */
@@ -344,13 +354,9 @@ export function planStats(plan: StatsInput, now: Date = new Date(), timeZone = '
   const goals = plan.goals.filter((g) => !g.removed);
   const doneSteps = steps.filter((s) => s.status === 'DONE').length;
   const blockedSteps = steps.filter((s) => s.status === 'BLOCKED').length;
-  const overdueSteps = steps.filter(
-    (s) => s.status !== 'DONE' && isOverdue(stepDueDate(s, plan.startDate), now, timeZone),
-  ).length;
+  const overdueSteps = steps.filter((s) => s.status !== 'DONE' && isOverdue(stepDueDate(s, plan.startDate), now, timeZone)).length;
   const doneGoals = goals.filter((g) => g.status === 'DONE').length;
-  const overdueGoals = goals.filter(
-    (g) => g.status !== 'DONE' && isOverdue(goalDueDate(g, plan.startDate), now, timeZone),
-  ).length;
+  const overdueGoals = goals.filter((g) => g.status !== 'DONE' && isOverdue(goalDueDate(g, plan.startDate), now, timeZone)).length;
   const total = steps.length + goals.length;
   const done = doneSteps + doneGoals;
   return {

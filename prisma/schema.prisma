@@ -41,6 +41,7 @@ model Team {
   templates   Template[]
   resources   TeamResource[]
   // Who is who: people in this team, and people who manage it.
+  guides      Guide[]
   orgMembers  OrgEntry[]     @relation("OrgEntryTeams")
   orgManagers OrgEntry[]     @relation("OrgEntryManages")
 }
@@ -102,6 +103,9 @@ model TemplateStep {
   doneWhen    String       @default("")
   // The week of onboarding the step belongs to (1 = the first week); null = no timing.
   week        Int?
+  // An optional guide the step points to ("Read the guide").
+  guideId     String?
+  guide       Guide?       @relation(fields: [guideId], references: [id], onDelete: SetNull)
   planSteps   PlanStep[]
 }
 
@@ -160,6 +164,8 @@ model PlanStep {
   dueDate        DateTime?
   status         StepStatus    @default(OPEN)
   note           String        @default("")
+  guideId        String?
+  guide          Guide?        @relation(fields: [guideId], references: [id], onDelete: SetNull)
   doneAt         DateTime?
 }
 
@@ -189,6 +195,39 @@ model TeamResource {
   location String
   note     String @default("")
   url      String @default("")
+  // Groups tools on the Tools page, e.g. "Development" or "Company".
+  category String @default("")
+}
+
+enum GuideCategory {
+  HOW_TO
+  PRACTICAL
+}
+
+// A short article ("how do I book hours", "at the office"). Without a team it is for everyone.
+model Guide {
+  id            String         @id @default(uuid())
+  title         String
+  category      GuideCategory  @default(HOW_TO)
+  // Rich text (sanitised HTML), may contain pasted images as data URIs.
+  body          String         @default("")
+  teamId        String?
+  team          Team?          @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  templateSteps TemplateStep[]
+  planSteps     PlanStep[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+// Who to contact for what ("Problems with your laptop" -> an address). Company-wide; shown under "Need help?".
+model HelpContact {
+  id       String  @id @default(uuid())
+  topic    String
+  contact  String
+  note     String  @default("")
+  // Shown first and highlighted, e.g. a security incident.
+  urgent   Boolean @default(false)
+  position Int
 }
 
 model OrgEntry {

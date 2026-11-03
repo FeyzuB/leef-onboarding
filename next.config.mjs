@@ -32,7 +32,8 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: {
     // Needed when the portal runs behind a reverse proxy on the internal server.
-    serverActions: allowedOrigins.length ? { allowedOrigins } : undefined,
+    // Guides and step explanations can carry pasted screenshots, so allow larger form posts.
+    serverActions: { bodySizeLimit: '4mb', ...(allowedOrigins.length ? { allowedOrigins } : {}) },
   },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];

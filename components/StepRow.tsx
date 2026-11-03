@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { PlanStep } from '@prisma/client';
-import { Check, ChevronRight, CircleAlert, Flag, Link2, UserRound } from 'lucide-react';
+import { BookOpen, Check, ChevronRight, CircleAlert, Flag, Link2, UserRound } from 'lucide-react';
 import { setStepStatus } from '@/app/actions/progress';
 import { SubmitButton } from '@/components/forms';
 import { RichText } from '@/components/RichText';
@@ -142,6 +142,14 @@ export function StepRow({
 
         <div className="mt-3 space-y-3 border-l-2 border-brand-100 pl-4 text-sm">
           <RichText value={step.explanation} className="text-slate-700" />
+          {step.guideId && (
+            <a
+              href={`/guides/${step.guideId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100"
+            >
+              <BookOpen size={15} /> Read the guide
+            </a>
+          )}
           <StepLinks links={links} />
           {(contact || step.doneWhen) && (
             <dl className="grid gap-1 text-xs text-slate-600 sm:grid-cols-2">

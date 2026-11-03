@@ -12,7 +12,10 @@ type StepDefaults = {
   doneWhen?: string;
   week?: number | null;
   dueDate?: Date | null;
+  guideId?: string | null;
 };
+
+export type GuideOption = { id: string; title: string };
 
 /** The shared inputs for a template step or a plan step. Plan steps can also get a fixed date (`withDate`). */
 export function StepFields({
@@ -20,11 +23,14 @@ export function StepFields({
   modules,
   listId,
   withDate = false,
+  guides = [],
 }: {
   defaults?: StepDefaults;
   modules: string[];
   listId: string;
   withDate?: boolean;
+  /** Guides the step can point to ("Read the guide"). */
+  guides?: GuideOption[];
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -83,6 +89,18 @@ export function StepFields({
           ))}
         </select>
       </Field>
+      <div className="sm:col-span-2">
+        <Field label="Guide" hint="Optional: the step then shows a “Read the guide” button.">
+          <select name="guideId" defaultValue={defaults.guideId ?? ''} className={inputClass}>
+            <option value="">No guide</option>
+            {guides.map((guide) => (
+              <option key={guide.id} value={guide.id}>
+                {guide.title}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
       {withDate && (
         <Field label="Or on date" hint="A fixed date wins over the week">
           <input name="dueDate" type="date" defaultValue={defaults.dueDate ? toDateInput(defaults.dueDate) : ''} className={inputClass} />

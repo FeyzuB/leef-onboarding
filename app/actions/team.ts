@@ -14,6 +14,7 @@ function fields(form: FormData) {
     location: required(form, 'location', 'Where', 200),
     note: text(form, 'note', 1000),
     url,
+    category: text(form, 'category', 60),
   };
 }
 

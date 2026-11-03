@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import type { User } from '@prisma/client';
-import { Compass, KeyRound, Layers, LayoutDashboard, LogOut, Network, Settings2, Sprout, Users } from 'lucide-react';
+import type { HelpContact, User } from '@prisma/client';
+import { BookOpen, Compass, KeyRound, Layers, LayoutDashboard, LifeBuoy, LogOut, Network, Settings2, Sprout, Users } from 'lucide-react';
 import { logout } from '@/app/actions/auth';
 import { NavLink } from '@/components/NavLink';
+import { Drawer } from '@/components/Drawer';
+import { HelpContacts } from '@/components/HelpContacts';
 import { Avatar } from '@/components/ui';
 import { isAdmin, isLead } from '@/lib/auth';
 
@@ -18,7 +20,8 @@ function navLinks(user: User, hasPlan: boolean) {
         ]
       : []),
     ...(hasPlan || !isLead(user) ? [{ href: '/my-plan', label: 'My plan', icon: <Sprout size={iconSize} /> }] : []),
-    { href: '/team', label: 'Where to find things', icon: <Compass size={iconSize} /> },
+    { href: '/guides', label: 'Guides', icon: <BookOpen size={iconSize} /> },
+    { href: '/team', label: 'Tools', icon: <Compass size={iconSize} /> },
     { href: '/organogram', label: 'Who is who', icon: <Network size={iconSize} /> },
     ...(isAdmin(user) ? [{ href: '/admin', label: 'Teams & roles', icon: <Settings2 size={iconSize} /> }] : []),
   ];
@@ -40,8 +43,31 @@ export function Logo() {
 
 const roleLabel = { NEW_HIRE: 'New colleague', LEAD: 'Lead', ADMIN: 'Admin' } as const;
 
+/** "Need help?": who to contact for what, one click away on every page. */
+function HelpButton({ contacts, className, compact = false }: { contacts: HelpContact[]; className: string; compact?: boolean }) {
+  return (
+    <Drawer
+      title="Need help?"
+      triggerClassName={className}
+      triggerLabel={compact ? 'Need help?' : undefined}
+      trigger={
+        <>
+          <LifeBuoy size={compact ? 18 : 16} />
+          {!compact && 'Need help?'}
+        </>
+      }
+    >
+      <p className="mb-4 text-sm text-slate-600">Who to contact for what. More answers in the Guides.</p>
+      <HelpContacts contacts={contacts} />
+      <Link href="/guides" className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline">
+        <BookOpen size={15} /> Open the guides
+      </Link>
+    </Drawer>
+  );
+}
+
 /** Sidebar on wide screens, a top bar with scrollable links on small ones. */
-export function Nav({ user, hasPlan }: { user: User; hasPlan: boolean }) {
+export function Nav({ user, hasPlan, helpContacts }: { user: User; hasPlan: boolean; helpContacts: HelpContact[] }) {
   const links = navLinks(user, hasPlan);
   return (
     <>
@@ -56,6 +82,10 @@ export function Nav({ user, hasPlan }: { user: User; hasPlan: boolean }) {
             </NavLink>
           ))}
         </nav>
+        <HelpButton
+          contacts={helpContacts}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent-50 px-3 py-2 text-sm font-semibold text-accent-700 ring-1 ring-accent-200 transition hover:bg-accent-100"
+        />
         <div className="border-t border-slate-100 pt-4">
           <div className="flex items-center gap-3 px-2">
             <Avatar name={user.name} />
@@ -87,6 +117,7 @@ export function Nav({ user, hasPlan }: { user: User; hasPlan: boolean }) {
         <div className="flex items-center justify-between px-4 py-3">
           <Logo />
           <div className="flex items-center gap-1">
+            <HelpButton contacts={helpContacts} compact className="rounded-lg p-2 text-accent-600 hover:bg-accent-50" />
             <Link href="/change-password" aria-label="Change password" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
               <KeyRound size={18} />
             </Link>

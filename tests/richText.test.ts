@@ -40,3 +40,17 @@ test('plain text explanations stay plain and open in the editor as paragraphs', 
   assert.equal(plainToHtml('a < b\nc'), '<p>a &lt; b</p><p>c</p>');
   assert.equal(toPlainText('<p>Met vriendelijke groet,</p><p><strong>Naam</strong></p>'), 'Met vriendelijke groet, Naam');
 });
+
+test('pasted raster images are kept, other image sources are dropped', () => {
+  const png = 'data:image/png;base64,iVBORw0KGgo=';
+  assert.equal(sanitizeRichText(`<p>Klik hier:</p><img src="${png}" alt="knop">`), `<p>Klik hier:</p><img src="${png}" alt="knop" />`);
+  assert.equal(sanitizeRichText(`<img src="${png}">`), `<img src="${png}" />`);
+  for (const bad of ['https://evil.example/x.png', 'data:image/svg+xml;base64,PHN2Zz4=', 'javascript:alert(1)', 'data:text/html;base64,PGI+']) {
+    assert.ok(!sanitizeRichText(`<p>a</p><img src="${bad}" onerror="alert(1)">`).includes('<img'), bad);
+  }
+});
+
+test('numbered lists keep a sane start number', () => {
+  assert.equal(sanitizeRichText('<ol start="4"><li><p>a</p></li></ol>'), '<ol start="4"><li><p>a</p></li></ol>');
+  assert.equal(sanitizeRichText('<ol start="4x" onclick="x"><li><p>a</p></li></ol>'), '<ol><li><p>a</p></li></ol>');
+});

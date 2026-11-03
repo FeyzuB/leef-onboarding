@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, CalendarDays, Eye, Link2, Pencil, Plus, RefreshCw, Target, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, Eye, Link2, Pencil, Plus, RefreshCw, Target, Trash2, UserRound } from 'lucide-react';
 import {
   addTemplateGoal,
   addTemplateStep,
@@ -35,6 +35,8 @@ import {
 import { inScope, requireLead } from '@/lib/auth';
 import { groupByModule, groupByPhase, stepVersion, templateContact, templateTimingLabel, toLinks } from '@/lib/logic';
 import { ViewSwitch, stepView } from '@/components/ViewSwitch';
+import type { GuideOption } from '@/components/StepFields';
+import { visibleGuides } from '@/lib/guides';
 import type { TemplateStep } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
@@ -52,6 +54,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
     include: { team: true, role: true, steps: true, goals: true, plans: { select: { templateVersion: true } } },
   });
   if (!template || !inScope(actor, template.teamId)) notFound();
+  const guides = await prisma.guide.findMany({ where: visibleGuides(actor), select: { id: true, title: true }, orderBy: { title: 'asc' } });
 
   const groups = groupByModule(template.steps);
   const modules = groups.map((g) => g.module);
@@ -141,7 +144,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
         >
           <AddForm action={addTemplateStep} className="space-y-4">
             <input type="hidden" name="templateId" value={template.id} />
-            <StepFields listId="modules-new" modules={modules} />
+            <StepFields listId="modules-new" modules={modules} guides={guides} />
             <SubmitButton>Add step</SubmitButton>
           </AddForm>
         </Drawer>
@@ -166,7 +169,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
                 </div>
                 <ol className="divide-y divide-slate-100">
                   {phase.items.map((step) => (
-                    <StepItem key={step.id} step={step} templateId={template.id} modules={modules} showModule />
+                    <StepItem key={step.id} step={step} templateId={template.id} modules={modules} guides={guides} showModule />
                   ))}
                 </ol>
               </li>
@@ -201,7 +204,7 @@ export default async function TemplateEditorPage(props: { params: Promise<{ id: 
                 </div>
                 <ol className="divide-y divide-slate-100">
                   {group.items.map((step) => (
-                    <StepItem key={step.id} step={step} templateId={template.id} modules={modules} movable />
+                    <StepItem key={step.id} step={step} templateId={template.id} modules={modules} guides={guides} movable />
                   ))}
                 </ol>
               </li>
@@ -307,12 +310,14 @@ function StepItem({
   step,
   templateId,
   modules,
+  guides,
   movable = false,
   showModule = false,
 }: {
   step: TemplateStep;
   templateId: string;
   modules: string[];
+  guides: GuideOption[];
   movable?: boolean;
   showModule?: boolean;
 }) {
@@ -341,6 +346,11 @@ function StepItem({
               <Link2 size={12} /> {links.length} link{links.length === 1 ? '' : 's'}
             </span>
           )}
+          {step.guideId && (
+            <span className="inline-flex items-center gap-1">
+              <BookOpen size={12} /> Guide
+            </span>
+          )}
           {step.doneWhen && <span>Done when: {step.doneWhen}</span>}
         </div>
       </div>
@@ -357,7 +367,7 @@ function StepItem({
           <form action={updateTemplateStep} className="space-y-4">
             <input type="hidden" name="templateId" value={templateId} />
             <input type="hidden" name="stepId" value={step.id} />
-            <StepFields listId={`modules-${step.id}`} modules={modules} defaults={{ ...step, links }} />
+            <StepFields listId={`modules-${step.id}`} modules={modules} guides={guides} defaults={{ ...step, links }} />
             <SubmitButton>Save step</SubmitButton>
           </form>
         </Drawer>

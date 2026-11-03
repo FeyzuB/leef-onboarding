@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, CalendarDays, CircleAlert, Clock, Pencil, Plus, RefreshCw, Settings, Target, Trash2, UserRound } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, CircleAlert, Clock, Pencil, Plus, RefreshCw, Settings, Target, Trash2, UserRound } from 'lucide-react';
 import {
   addGoal,
   addPlanStep,
@@ -55,6 +55,8 @@ import {
 } from '@/lib/logic';
 import { prisma } from '@/lib/prisma';
 import { ViewSwitch, stepView } from '@/components/ViewSwitch';
+import type { GuideOption } from '@/components/StepFields';
+import { visibleGuides } from '@/lib/guides';
 import type { OrgEntry, PlanStep } from '@prisma/client';
 
 export default async function PlanEditorPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ view?: string }> }) {
@@ -67,12 +69,13 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
   });
   if (!plan || !inScope(actor, plan.newHire.teamId)) notFound();
 
-  const [leads, people] = await Promise.all([
+  const [leads, people, guides] = await Promise.all([
     prisma.user.findMany({
       where: { active: true, OR: [{ appRole: 'ADMIN' }, { appRole: 'LEAD', ...teamScope(actor) }] },
       orderBy: { name: 'asc' },
     }),
     prisma.orgEntry.findMany({ orderBy: { name: 'asc' } }),
+    prisma.guide.findMany({ where: visibleGuides(actor), select: { id: true, title: true }, orderBy: { title: 'asc' } }),
   ]);
 
   const now = new Date();
@@ -259,7 +262,7 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
         >
           <AddForm action={addPlanStep} className="space-y-4">
             <input type="hidden" name="planId" value={plan.id} />
-            <StepFields withDate listId="modules-new" modules={modules} />
+            <StepFields withDate listId="modules-new" modules={modules} guides={guides} />
             <SubmitButton>Add step</SubmitButton>
           </AddForm>
         </Drawer>
@@ -299,6 +302,7 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
                         plan={plan}
                         people={people}
                         modules={modules}
+                        guides={guides}
                         now={now}
                         isNext={step.id === next?.id}
                         showModule
@@ -332,6 +336,7 @@ export default async function PlanEditorPage(props: { params: Promise<{ id: stri
                         plan={plan}
                         people={people}
                         modules={modules}
+                        guides={guides}
                         now={now}
                         isNext={step.id === next?.id}
                         movable
@@ -395,6 +400,7 @@ function PlanStepItem({
   plan,
   people,
   modules,
+  guides,
   now,
   isNext,
   movable = false,
@@ -404,6 +410,7 @@ function PlanStepItem({
   plan: PlanForStep;
   people: Pick<OrgEntry, 'id' | 'name'>[];
   modules: string[];
+  guides: GuideOption[];
   now: Date;
   isNext: boolean;
   movable?: boolean;
@@ -428,6 +435,11 @@ function PlanStepItem({
               <UserRound size={12} /> {contact.text}
             </span>
           )}
+          {step.guideId && (
+            <span className="inline-flex items-center gap-1">
+              <BookOpen size={12} /> Guide
+            </span>
+          )}
           {step.tailored ? <Badge tone="accent">Tailored</Badge> : step.templateStepId && <Badge>From template</Badge>}
           {step.status === 'BLOCKED' && <Badge tone="red">Stuck: {step.note || 'no note'}</Badge>}
           {late && <Badge tone="amber">Overdue</Badge>}
@@ -446,7 +458,7 @@ function PlanStepItem({
           <form action={updatePlanStep} className="space-y-4">
             <input type="hidden" name="planId" value={plan.id} />
             <input type="hidden" name="stepId" value={step.id} />
-            <StepFields withDate listId={`modules-${step.id}`} modules={modules} defaults={{ ...step, links: toLinks(step.links) }} />
+            <StepFields withDate listId={`modules-${step.id}`} modules={modules} guides={guides} defaults={{ ...step, links: toLinks(step.links) }} />
             <SubmitButton>Save step</SubmitButton>
           </form>
         </Drawer>
