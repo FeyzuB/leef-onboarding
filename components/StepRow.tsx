@@ -1,37 +1,13 @@
-import type { ReactNode } from 'react';
 import type { PlanStep } from '@prisma/client';
-import { BookOpen, Check, ChevronRight, CircleAlert, Flag, Link2, UserRound } from 'lucide-react';
+import { BookOpen, ChevronRight, CircleAlert, Flag, Link2, UserRound } from 'lucide-react';
 import { setStepStatus } from '@/app/actions/progress';
 import { SubmitButton } from '@/components/forms';
+import { StepCheckButton } from '@/components/StepCheckButton';
 import { RichText } from '@/components/RichText';
 import { StepLinks } from '@/components/StepFields';
 import { Badge, inputClass, secondaryButtonClass, smallButtonClass } from '@/components/ui';
 import { APP_TIMEZONE } from '@/lib/config';
 import { formatDate, isOverdue, stepDueDate, stepTimingLabel, toLinks, type ResolvedContact } from '@/lib/logic';
-
-function StatusForm({
-  stepId,
-  status,
-  children,
-  className,
-  label,
-}: {
-  stepId: string;
-  status: string;
-  children: ReactNode;
-  className: string;
-  label: string;
-}) {
-  return (
-    <form action={setStepStatus}>
-      <input type="hidden" name="stepId" value={stepId} />
-      <input type="hidden" name="status" value={status} />
-      <button type="submit" aria-label={label} title={label} className={className}>
-        {children}
-      </button>
-    </form>
-  );
-}
 
 /** A contact, linked to their card on Who is who when they are on it. */
 export function ContactName({ contact }: { contact: ResolvedContact }) {
@@ -49,28 +25,9 @@ export function ContactName({ contact }: { contact: ResolvedContact }) {
 
 /** The round tick in front of a step: ticks it off, or opens it again. */
 export function StepCheck({ step, readOnly = false }: { step: PlanStep; readOnly?: boolean }) {
-  const done = step.status === 'DONE';
   // Previews show the circle without a form.
   if (readOnly) return <span aria-hidden className="block h-6 w-6 rounded-full border-2 border-slate-300 bg-white" />;
-  return done ? (
-    <StatusForm
-      stepId={step.id}
-      status="OPEN"
-      label="Mark as not done"
-      className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white shadow-sm transition hover:bg-brand-600"
-    >
-      <Check size={14} strokeWidth={3} />
-    </StatusForm>
-  ) : (
-    <StatusForm
-      stepId={step.id}
-      status="DONE"
-      label="Mark as done"
-      className="group flex h-6 w-6 items-center justify-center rounded-full border-2 border-slate-300 bg-white text-transparent transition hover:border-brand-500 hover:text-brand-500"
-    >
-      <Check size={14} strokeWidth={3} />
-    </StatusForm>
-  );
+  return <StepCheckButton stepId={step.id} done={step.status === 'DONE'} />;
 }
 
 /**
